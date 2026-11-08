@@ -1,0 +1,672 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<title>Прогрессия</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.47.0/tabler-icons.min.css">
+<style>
+:root{--bg:#fff8f2;--card:#fff;--line:#f1e4d8;--text:#2b1d14;--muted:#9a8473;--acc:#f26b1d;--onacc:#fff;--accSoft:#ffe1cc;--accText:#a0420b;--track:#f6e9dd;--off:#f6efe8;--ok:#1f8a4c;--okSoft:#e2f5ea;--bad:#c0392b;--badSoft:#fdeaea;--warnSoft:#fff1e6;--warnLine:#ffd3b3}
+html.dark{--bg:#16110d;--card:#211913;--line:#34281f;--text:#f5ebe2;--muted:#a8927f;--acc:#ff7a2e;--onacc:#1a0f08;--accSoft:#4a2a14;--accText:#ffb27f;--track:#34281f;--off:#2a211a;--ok:#4cc27e;--okSoft:#173222;--bad:#ff8a7a;--badSoft:#3a1a16;--warnSoft:#3a2414;--warnLine:#5c3a1f}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;background:var(--bg);color:var(--text);font:14px/1.4 -apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,sans-serif}
+#app{max-width:480px;margin:0 auto;padding:16px 14px 120px}
+h1{font-size:24px;font-weight:600;margin:4px 0 12px}
+h2{font-size:20px;font-weight:600;margin:0}
+.c{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:12px;margin-bottom:10px}
+.m{color:var(--muted);font-size:12px}
+.o{color:var(--acc)}
+.row{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+.grid2 .c{margin:0}
+.big{font-size:24px;font-weight:600}
+.btn{display:block;width:100%;border:0;border-radius:16px;padding:14px;font:600 15px/1 inherit;font-family:inherit;background:var(--acc);color:var(--onacc);cursor:pointer;text-align:center}
+.btn.sec{background:var(--card);color:var(--text);border:1px solid var(--line)}
+.btn.sm{padding:10px;font-size:13px;border-radius:12px}
+.cal{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:10px}
+.cal div{border-radius:10px;padding:8px 0;text-align:center;font-size:12px;background:var(--off);color:var(--muted)}
+.cal .done{background:var(--acc);color:var(--onacc)}
+.cal .now{background:var(--accSoft);color:var(--accText);outline:1.5px solid var(--acc)}
+.bar{height:6px;background:var(--track);border-radius:3px;overflow:hidden}
+.bar>div{height:100%;background:var(--acc);border-radius:3px}
+.badge{display:inline-block;font-size:11px;padding:2px 8px;border-radius:8px;background:var(--accSoft);color:var(--accText)}
+.badge.ok{background:var(--okSoft);color:var(--ok)}
+.badge.bad{background:var(--badSoft);color:var(--bad)}
+.ex{display:flex;align-items:center;gap:10px;cursor:pointer}
+.ex .n{flex:1;min-width:0}
+.st{width:28px;height:28px;border-radius:50%;border:1.5px solid var(--line);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:13px}
+.st.done{background:var(--acc);border-color:var(--acc);color:var(--onacc)}
+.st.part{border-color:var(--acc);color:var(--acc);font-size:11px}
+.st.skip{color:var(--muted)}
+.warn{background:var(--warnSoft);border-color:var(--warnLine);color:var(--accText)}
+.stepper{display:flex;align-items:center;gap:6px}
+.stepper button{width:34px;height:34px;border-radius:10px;border:1px solid var(--line);background:var(--off);color:var(--text);font-size:16px;cursor:pointer}
+.stepper input{width:58px;height:34px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--text);text-align:center;font:600 15px inherit;font-family:inherit}
+.loadbox{text-align:center;padding:14px 12px}
+.loadbox .stepper{justify-content:center;margin:6px 0}
+.loadbox input{width:110px;height:52px;font-size:30px;border-radius:14px}
+.loadbox .stepper button{width:52px;height:52px;border-radius:14px;font-size:22px}
+.set{display:flex;align-items:center;gap:8px;padding:8px 0;border-top:1px solid var(--line)}
+.set:first-of-type{border-top:0}
+.set .l{flex:1}
+.chk{width:36px;height:36px;border-radius:50%;border:1.5px solid var(--line);background:transparent;color:var(--muted);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.chk.on{background:var(--acc);border-color:var(--acc);color:var(--onacc)}
+.chips{display:flex;gap:6px}
+.chips button{flex:1;padding:10px 0;border-radius:12px;border:1px solid var(--line);background:var(--off);color:var(--text);font:500 14px inherit;font-family:inherit;cursor:pointer}
+.chips button.on{background:var(--acc);border-color:var(--acc);color:var(--onacc)}
+.toggle{display:flex;align-items:center;gap:8px;margin-top:10px;cursor:pointer;font-size:13px}
+.toggle .box{width:20px;height:20px;border-radius:6px;border:1.5px solid var(--line);display:flex;align-items:center;justify-content:center;color:var(--onacc)}
+.toggle.on .box{background:var(--bad);border-color:var(--bad)}
+.ladder{display:flex;gap:4px;align-items:flex-end;height:56px}
+.ladder div{flex:1;border-radius:4px;background:var(--off)}
+.ladder .past{background:var(--accSoft)}
+.ladder .cur{background:var(--acc)}
+.ll{display:flex;gap:4px;margin-top:4px}
+.ll span{flex:1;text-align:center;font-size:10px;color:var(--muted)}
+.ll .cur{color:var(--acc);font-weight:600}
+.nav{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);display:flex;justify-content:center;padding:6px 0 calc(6px + env(safe-area-inset-bottom))}
+.nav button{flex:1;max-width:160px;border:0;background:none;color:var(--muted);font:500 11px inherit;font-family:inherit;display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;padding:4px}
+.nav button i{font-size:22px}
+.nav button.on{color:var(--acc)}
+.timer{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(14px + env(safe-area-inset-bottom));width:calc(100% - 28px);max-width:452px;background:var(--text);color:var(--bg);border-radius:16px;padding:10px 14px;display:flex;align-items:center;gap:10px;z-index:5}
+.timer .t{font-size:22px;font-weight:600;font-variant-numeric:tabular-nums;min-width:64px}
+.timer button{border:0;background:rgba(127,127,127,.25);color:inherit;border-radius:10px;padding:8px 10px;font:500 13px inherit;font-family:inherit;cursor:pointer}
+.timer .tb{flex:1;height:4px;background:rgba(127,127,127,.35);border-radius:2px;overflow:hidden}
+.timer .tb div{height:100%;background:var(--acc)}
+.back{border:0;background:none;color:var(--text);font-size:22px;padding:0;cursor:pointer}
+.tabs{display:flex;gap:6px;overflow-x:auto;margin-bottom:10px;padding-bottom:2px}
+.tabs button{white-space:nowrap;border:1px solid var(--line);background:var(--card);color:var(--text);border-radius:12px;padding:7px 11px;font:500 12px inherit;font-family:inherit;cursor:pointer}
+.tabs button.on{background:var(--acc);border-color:var(--acc);color:var(--onacc)}
+.lad{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
+.lad span{font-size:11px;padding:3px 7px;border-radius:7px;background:var(--off);color:var(--muted)}
+.lad span.cur{background:var(--acc);color:var(--onacc)}
+.lad span.past{background:var(--accSoft);color:var(--accText)}
+textarea{width:100%;min-height:120px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--text);padding:10px;font:12px monospace}
+.sum-i{width:30px;height:30px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="timer"></div>
+<script>
+const PROGRAM = {
+  D1: [
+    {id:'pull_light', name:'Подтягивания лёгкие', type:'fixed', sets:3, reps:5, note:'Пауза вверху, вес тела, все 6 тренировок', rest:75},
+    {id:'sumo', name:'Сумо', type:'weight', sets:3, reps:12, start:30, offs:[0,5,10,15,20,25], round:2.5, rest:150, base:true},
+    {id:'bench', name:'Жим лёжа', type:'weight', sets:3, reps:10, start:50, offs:[0,2.5,5,7.5,10,12.5], round:2.5, rest:150, base:true},
+    {id:'db_row', name:'Тяга гантелей 30°', type:'weight', sets:3, reps:12, start:20, offs:[0,0,2,2,4,4], round:2, rest:120, base:true},
+    {id:'db_press', name:'Жим гантелей сидя', type:'weight', sets:3, reps:15, start:9, offs:[0,0,1,1,2,2], round:1, rest:120},
+    {id:'lateral', name:'Отведения 60°', type:'weight', sets:3, reps:15, start:5, offs:[0,0,1,1,2,2], round:1, rest:75},
+    {id:'leg_curl', name:'Сгибание голени', type:'weight', sets:3, reps:12, start:27.5, offs:[0,2.5,5,7.5,10,12.5], round:2.5, rest:75},
+    {id:'calf', name:'Подъём на носки', type:'weight', sets:3, reps:15, start:80, offs:[0,5,10,15,20,25], round:5, rest:75},
+    {id:'bosu', name:'Скручивания на BOSU', type:'fixed', sets:3, reps:15, note:'Дальше — с блином на груди', rest:75},
+    {id:'hang', name:'Вис', type:'time', sets:2, start:30, offs:[0,5,10,15,20,25], round:5, rest:75},
+  ],
+  D2: [
+    {id:'pullups', name:'Подтягивания', type:'reps', sets:3, start:0, extra:true, noReserve:true, addAfter:2.5, round:2.5,
+      repsSteps:[[7,7,8],[8,7,8],[8,8,8],[9,8,8],[9,9,8],[9,9,9]], note:'Последний подход — в отказ. После 9/9/9: +2,5 кг и снова с 7/7/8', rest:180, base:true},
+    {id:'incline_db', name:'Жим гантелей на наклонной', type:'weight', sets:3, reps:10, start:20, offs:[0,0,2,2,4,4], round:2, rest:150, base:true},
+    {id:'cgbp', name:'Жим узким хватом', type:'weight', sets:3, reps:10, start:40, offs:[0,2.5,5,7.5,10,12.5], round:2.5, rest:150, base:true},
+    {id:'curl', name:'Подъём штанги на бицепс', type:'reps', sets:3, start:20, addAfter:2.5, round:2.5,
+      repsSteps:[[8,8,8],[9,9,9],[10,10,10],[11,11,11],[12,12,12],[12,12,12]], note:'Растут повторы. После 3×12: +2,5 кг и снова с 3×8', rest:90},
+    {id:'crossover', name:'Кроссовер с нижнего блока', type:'weight', sets:3, reps:15, start:5, offs:[0,0,2.5,2.5,5,5], round:2.5, rest:75, note:'Шаг = 1 плитка (считаем 2,5 кг)'},
+    {id:'ext', name:'Экстензия', type:'weight', sets:3, reps:12, start:5, offs:[0,0,2.5,2.5,5,5], round:2.5, rest:75},
+    {id:'leg_press', name:'Жим ногами', type:'weight', sets:3, reps:12, start:140, offs:[0,10,20,30,40,50], round:5, rest:150, base:true},
+    {id:'plank', name:'Планка', type:'time', sets:3, start:60, offs:[0,5,10,15,20,25], round:5, rest:75},
+  ]
+};
+const DAY_NAME = {D1:'День 1', D2:'День 2'};
+const ALL = [...PROGRAM.D1, ...PROGRAM.D2];
+const EX = Object.fromEntries(ALL.map(e => [e.id, e]));
+const KEY = 'fitprog_v1';
+
+const tg = window.Telegram && window.Telegram.WebApp;
+const inTg = !!(tg && tg.initData);
+if (tg) { try { tg.ready(); tg.expand(); } catch (e) {} }
+const dark = inTg ? tg.colorScheme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+document.documentElement.classList.toggle('dark', dark);
+if (inTg) { try { tg.setHeaderColor(dark ? '#16110d' : '#fff8f2'); tg.setBackgroundColor(dark ? '#16110d' : '#fff8f2'); } catch (e) {} }
+
+const fmt = n => n == null ? '' : String(Math.round(n * 100) / 100).replace('.', ',');
+const roundTo = (x, r) => Math.round(x / r) * r;
+const haptic = t => { try { inTg && tg.HapticFeedback.impactOccurred(t || 'light'); } catch (e) {} };
+const ask = (msg, cb) => { if (inTg && tg.showConfirm && tg.isVersionAtLeast('6.2')) tg.showConfirm(msg, ok => ok && cb()); else if (confirm(msg)) cb(); };
+const say = msg => { if (inTg && tg.showAlert && tg.isVersionAtLeast('6.2')) tg.showAlert(msg); else alert(msg); };
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+function freshState() {
+  const ex = {};
+  for (const e of ALL) ex[e.id] = initEx(e);
+  return {version:1, updated:0, sessionIdx:0, calibrated:{D1:false, D2:false}, ex, history:[], active:null};
+}
+function initEx(e) {
+  if (e.type === 'fixed') return {};
+  if (e.type === 'reps') return {weight:e.start, step:0, fails:0, check:false};
+  return {base:e.start, step:0, fails:0, check:false};
+}
+function minInc(e) {
+  const d = e.offs.map((o, i) => i ? o - e.offs[i - 1] : 0).filter(x => x > 0);
+  return d.length ? Math.min(...d) : e.round;
+}
+function ladderLen(e) { return e.type === 'reps' ? e.repsSteps.length : e.type === 'fixed' ? 0 : e.offs.length; }
+function target(e, s) {
+  if (e.type === 'fixed') return {load:null, reps:Array(e.sets).fill(e.reps)};
+  if (e.type === 'reps') return {load:s.weight, reps:[...e.repsSteps[s.step]]};
+  const v = s.base + e.offs[s.step];
+  if (e.type === 'time') return {load:v, reps:Array(e.sets).fill(v)};
+  return {load:v, reps:Array(e.sets).fill(e.reps)};
+}
+function loadLabel(e, load) {
+  if (e.type === 'fixed') return 'вес тела';
+  if (e.type === 'time') return fmt(load) + ' с';
+  if (e.extra) return load > 0 ? '+' + fmt(load) + ' кг' : 'вес тела';
+  return fmt(load) + ' кг';
+}
+function planLabel(e, t) {
+  if (e.type === 'time') return e.sets + ' × ' + fmt(t.load) + ' с';
+  const same = t.reps.every(r => r === t.reps[0]);
+  const reps = same ? e.sets + '×' + t.reps[0] : t.reps.join('/');
+  return reps + ' · ' + loadLabel(e, t.load);
+}
+function ladderValues(e, s) {
+  if (e.type === 'reps') return e.repsSteps.map(r => r.every(x => x === r[0]) ? '3×' + r[0] : r.join('/'));
+  return e.offs.map(o => fmt(s.base + o));
+}
+
+function stepUp(e, s) {
+  const n = ladderLen(e);
+  if (s.step < n - 1) { s.step++; return; }
+  if (e.type === 'reps') { s.weight += e.addAfter; s.step = 0; return; }
+  s.base = s.base + e.offs[s.step] + minInc(e); s.step = 0;
+}
+function stepDown(e, s) {
+  if (e.type === 'reps') {
+    if (s.step > 0) s.step--;
+    else if (s.weight - e.addAfter >= (e.extra ? 0 : e.round)) { s.weight -= e.addAfter; s.step = ladderLen(e) - 1; }
+    return;
+  }
+  const v = e.offs[s.step];
+  let j = s.step - 1;
+  while (j >= 0 && e.offs[j] >= v) j--;
+  if (j >= 0) s.step = j;
+  else { s.base = s.base + v - minInc(e); s.step = 0; }
+}
+function deload(e, s, cur) {
+  if (e.type === 'reps') {
+    s.weight = e.extra ? roundTo(cur * 0.9, e.round) : Math.max(e.round, roundTo(cur * 0.9, e.round));
+    s.step = 0;
+  } else {
+    s.base = Math.max(e.round, roundTo(cur * 0.9, e.round)); s.step = 0;
+  }
+  s.fails = 0; s.check = false;
+}
+
+function evaluate(e, s, it, calib) {
+  if (e.type === 'fixed') return {d:'fixed', why:'Без прогрессии'};
+  if (it.skipped) return {d:'skip', why:'Пропущено — план тот же'};
+  const allMet = it.targets.every((t, i) => it.checked[i] && it.done[i] >= t);
+  const reserveOk = e.noReserve || (it.reserve !== null && it.reserve >= 1);
+  const planned = target(e, s).load;
+  if (calib) {
+    if (e.type === 'reps') s.weight = it.load;
+    else { s.step = 0; s.base = it.load; }
+    s.check = false; s.fails = 0;
+  } else if (it.load !== planned) {
+    if (e.type === 'reps') s.weight = it.load; else s.base = it.load - e.offs[s.step];
+  }
+  const cur = it.load;
+  if (allMet && reserveOk && !it.tech) {
+    stepUp(e, s); s.check = true; s.fails = 0;
+    return {d:'up', why: calib ? 'Стартовый вес зафиксирован, всё чисто — шаг вверх' : 'Всё чисто, с запасом — шаг вверх'};
+  }
+  if (it.tech) { s.check = false; return {d:'keep', why: (calib ? 'Стартовый вес зафиксирован. ' : '') + 'Техника поплыла — вес не растёт'}; }
+  if (s.check) { stepDown(e, s); s.check = false; s.fails = 0; return {d:'back', why:'Проверка нового веса не пройдена — откат на шаг'}; }
+  if (!allMet) {
+    s.fails++;
+    if (s.fails >= 2) { deload(e, s, cur); return {d:'deload', why:'Два раза подряд не добрал — минус 10%'}; }
+    return {d:'keep', why: (calib ? 'Стартовый вес зафиксирован. ' : '') + 'Не добрал — в следующий раз то же'};
+  }
+  s.fails = 0;
+  return {d:'keep', why: (calib ? 'Стартовый вес зафиксирован. ' : '') + 'Без запаса — повторяем этот же шаг'};
+}
+
+let state = load();
+let view = {tab:'home', screen:null, exIdx:0, progEx:'bench', summary:null};
+let timer = null;
+
+function load() {
+  try { const s = JSON.parse(localStorage.getItem(KEY)); if (s && s.version === 1) return migrate(s); } catch (e) {}
+  return freshState();
+}
+function migrate(s) { for (const e of ALL) if (!s.ex[e.id]) s.ex[e.id] = initEx(e); return s; }
+let cloudT = null;
+function save() {
+  state.updated = Date.now();
+  const str = JSON.stringify(state);
+  try { localStorage.setItem(KEY, str); } catch (e) {}
+  clearTimeout(cloudT);
+  cloudT = setTimeout(() => cloudSave(str), 800);
+}
+function cloudSave(str) {
+  if (!inTg || !tg.CloudStorage || !tg.isVersionAtLeast || !tg.isVersionAtLeast('6.9')) return;
+  try {
+    const n = Math.ceil(str.length / 4000);
+    for (let i = 0; i < n; i++) tg.CloudStorage.setItem('p' + i, str.slice(i * 4000, (i + 1) * 4000));
+    tg.CloudStorage.setItem('meta', JSON.stringify({n, updated:state.updated}));
+  } catch (e) {}
+}
+function cloudLoad() {
+  if (!inTg || !tg.CloudStorage || !tg.isVersionAtLeast || !tg.isVersionAtLeast('6.9')) return;
+  try {
+    tg.CloudStorage.getItem('meta', (err, v) => {
+      if (err || !v) return;
+      const meta = JSON.parse(v);
+      if (meta.updated <= (state.updated || 0)) return;
+      const keys = Array.from({length:meta.n}, (_, i) => 'p' + i);
+      tg.CloudStorage.getItems(keys, (err2, vals) => {
+        if (err2) return;
+        try {
+          const s = JSON.parse(keys.map(k => vals[k]).join(''));
+          if (s && s.version === 1) { state = migrate(s); localStorage.setItem(KEY, JSON.stringify(state)); render(); }
+        } catch (e) {}
+      });
+    });
+  } catch (e) {}
+}
+
+function currentDay(idx) { return idx % 2 === 0 ? 'D1' : 'D2'; }
+function cyclePos(idx) { const p = idx % 12; return {week:Math.floor(p / 3) + 1, inWeek:p % 3 + 1, pos:p}; }
+
+function startSession() {
+  if (state.active) { openWorkout(); return; }
+  const day = currentDay(state.sessionIdx);
+  const calib = !state.calibrated[day];
+  state.active = {
+    day, calib, idx:state.sessionIdx, started:Date.now(),
+    items: PROGRAM[day].map(e => {
+      const t = target(e, state.ex[e.id]);
+      return {id:e.id, load:t.load, plannedLoad:t.load, targets:t.reps, done:[...t.reps], checked:t.reps.map(() => false), reserve:null, tech:false, skipped:false};
+    })
+  };
+  save(); haptic('medium'); openWorkout();
+}
+function openWorkout() { view.screen = 'workout'; render(); scrollTo(0, 0); }
+function openEx(i) { view.screen = 'ex'; view.exIdx = i; render(); scrollTo(0, 0); }
+
+function finishSession() {
+  const a = state.active;
+  const results = [];
+  for (const it of a.items) {
+    const e = EX[it.id];
+    const s = state.ex[it.id];
+    const before = e.type === 'fixed' ? null : planLabel(e, {load:it.load, reps:it.targets});
+    const r = evaluate(e, s, it, a.calib);
+    const after = e.type === 'fixed' ? null : planLabel(e, target(e, s));
+    results.push({id:it.id, d:r.d, why:r.why, before, after});
+  }
+  state.history.push({
+    date:Date.now(), day:a.day, idx:a.idx, calib:a.calib,
+    items:a.items.map((it, i) => ({id:it.id, load:it.load, targets:it.targets, done:it.done.map((v, j) => it.checked[j] ? v : 0), reserve:it.reserve, tech:it.tech, skipped:it.skipped, d:results[i].d}))
+  });
+  if (a.calib) state.calibrated[a.day] = true;
+  state.sessionIdx++;
+  state.active = null;
+  save(); haptic('heavy');
+  stopTimer();
+  view.screen = 'summary'; view.summary = {day:a.day, calib:a.calib, results};
+  render(); scrollTo(0, 0);
+}
+
+function startTimer(sec) {
+  timer = {end:Date.now() + sec * 1000, total:sec};
+  tickTimer();
+}
+function stopTimer() { timer = null; document.getElementById('timer').innerHTML = ''; }
+function tickTimer() {
+  const el = document.getElementById('timer');
+  if (!timer) { el.innerHTML = ''; return; }
+  const left = Math.max(0, Math.round((timer.end - Date.now()) / 1000));
+  const mm = Math.floor(left / 60), ss = String(left % 60).padStart(2, '0');
+  const pct = Math.min(100, 100 * (1 - left / timer.total));
+  el.innerHTML = `<div class="timer"><i class="ti ti-clock" style="font-size:20px"></i><span class="t">${mm}:${ss}</span><div class="tb"><div style="width:${pct}%"></div></div><button data-a="t30">+30 с</button><button data-a="tstop" aria-label="Закрыть"><i class="ti ti-x"></i></button></div>`;
+  if (left === 0) {
+    try { inTg && tg.HapticFeedback.notificationOccurred('success'); } catch (e) {}
+    if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+    timer = null; setTimeout(() => { if (!timer) el.innerHTML = ''; }, 2500);
+    el.querySelector('.t').textContent = 'Пора!';
+  }
+}
+setInterval(() => { if (timer) tickTimer(); }, 1000);
+
+function restLabel(sec) { return sec >= 180 ? '3 мин' : sec >= 150 ? '2–3 мин' : sec >= 120 ? '2 мин' : sec >= 90 ? '1,5 мин' : '1–1,5 мин'; }
+
+/* ---------- screens ---------- */
+function home() {
+  const idx = state.sessionIdx;
+  const day = currentDay(idx);
+  const calib = !state.calibrated[day];
+  const cp = cyclePos(idx);
+  const cycleNo = Math.floor(idx / 12) + 1;
+  let cal = '';
+  for (let w = 0; w < 4; w++) {
+    cal += `<div class="m" style="margin-bottom:6px">Неделя ${w + 1}</div><div class="cal">`;
+    for (let k = 0; k < 3; k++) {
+      const p = w * 3 + k, abs = Math.floor(idx / 12) * 12 + p;
+      const cls = abs < idx ? 'done' : abs === idx ? 'now' : '';
+      cal += `<div class="${cls}">${DAY_NAME[currentDay(abs)].replace('День ', 'Д')}${abs === idx ? ' · сейчас' : ''}</div>`;
+    }
+    cal += '</div>';
+  }
+  const alerts = [];
+  for (const e of ALL) {
+    const s = state.ex[e.id];
+    if (s.fails === 1) alerts.push(`<b>${e.name}</b>: один раз не добрал на ${loadLabel(e, target(e, s).load)}. Ещё раз — и откат −10%.`);
+  }
+  const last = state.history[state.history.length - 1];
+  if (last) for (const it of last.items) if (it.d === 'deload' || it.d === 'back') {
+    const e = EX[it.id];
+    alerts.push(`<b>${e.name}</b>: ${it.d === 'deload' ? 'откат −10%' : 'откат на шаг'}, теперь ${planLabel(e, target(e, state.ex[e.id]))}.`);
+  }
+  const n = PROGRAM[day].length;
+  return `
+  <h1>Сегодня</h1>
+  <div class="c">
+    <div class="row"><span class="m">Цикл ${cycleNo} · неделя ${cp.week} · тренировка ${cp.inWeek} из 3</span>${calib ? '<span class="badge">стартовая</span>' : ''}</div>
+    <div class="big" style="margin:4px 0 2px">${DAY_NAME[day]}</div>
+    <div class="m">${n} упражнений</div>
+    ${calib ? `<div class="c warn" style="margin:10px 0 0"><i class="ti ti-target-arrow"></i> Стартовая тренировка. В каждом упражнении стоит вес из плана — поставь свой реальный рабочий вес. От него пойдёт прогрессия.</div>` : ''}
+  </div>
+  ${state.active ? `<button class="btn" data-a="start" style="margin-bottom:10px">Продолжить ${DAY_NAME[state.active.day]}</button>` : `<button class="btn" data-a="start" style="margin-bottom:10px">Начать ${DAY_NAME[day]}</button>`}
+  ${alerts.map(a => `<div class="c warn"><i class="ti ti-alert-triangle"></i> ${a}</div>`).join('')}
+  <div class="c"><div class="row" style="margin-bottom:8px"><span style="font-weight:600">Цикл 4 недели</span><span class="m">${idx % 12} / 12</span></div>${cal}</div>`;
+}
+
+function workout() {
+  const a = state.active;
+  const items = a.items.map((it, i) => {
+    const e = EX[it.id];
+    const nDone = it.checked.filter(Boolean).length;
+    const st = it.skipped ? `<div class="st skip"><i class="ti ti-player-skip-forward"></i></div>`
+      : nDone === it.targets.length ? `<div class="st done"><i class="ti ti-check"></i></div>`
+      : nDone ? `<div class="st part">${nDone}/${it.targets.length}</div>` : `<div class="st"></div>`;
+    const changed = e.type !== 'fixed' && !a.calib && state.ex[it.id] && (() => {
+      const h = lastResult(it.id); if (!h) return '';
+      const diff = it.load - h.load;
+      return diff > 0 ? ` <span class="o">+${fmt(diff)}</span>` : '';
+    })();
+    return `<div class="c ex" data-a="ex" data-i="${i}"><div class="n"><div>${e.name}</div><div class="m">${planLabel(e, {load:it.load, reps:it.targets})}${changed || ''}</div>${nDone && !it.skipped ? `<div style="font-size:12px;margin-top:2px;color:${it.checked.every(Boolean) && it.done.every((d, k) => d >= it.targets[k]) ? 'var(--ok)' : 'var(--accText)'}">Сделано: ${it.done.map((d, k) => it.checked[k] ? d : '–').join(' / ')}${e.type === 'time' ? ' с' : ''}${it.reserve !== null ? ' · запас ' + (it.reserve === 3 ? '3+' : it.reserve) : ''}${it.tech ? ' · техника' : ''}</div>` : ''}</div>${st}</div>`;
+  }).join('');
+  const total = a.items.length, done = a.items.filter(it => it.skipped || it.checked.every(Boolean)).length;
+  return `
+  <div class="row" style="margin-bottom:8px"><button class="back" data-a="home" aria-label="Назад"><i class="ti ti-arrow-left"></i></button><span class="m">${done} / ${total} готово</span><span></span></div>
+  <h1 style="margin-bottom:4px">${DAY_NAME[a.day]}</h1>
+  ${a.calib ? `<div class="m" style="margin-bottom:10px">Стартовая тренировка — открой упражнение и поставь реальный вес</div>` : '<div style="height:6px"></div>'}
+  <div class="bar" style="margin-bottom:12px"><div style="width:${100 * done / total}%"></div></div>
+  ${items}
+  <button class="btn" data-a="finish" style="margin-top:6px">Завершить тренировку</button>
+  <button class="btn sec sm" data-a="cancel" style="margin-top:8px">Отменить тренировку</button>`;
+}
+function lastResult(id) {
+  for (let i = state.history.length - 1; i >= 0; i--) {
+    const it = state.history[i].items.find(x => x.id === id && !x.skipped);
+    if (it) return it;
+  }
+  return null;
+}
+
+function exScreen() {
+  const a = state.active, i = view.exIdx, it = a.items[i], e = EX[it.id], s = state.ex[it.id];
+  const prev = lastResult(it.id);
+  const unit = e.type === 'time' ? 'с' : 'повт';
+  let loadBlock = '';
+  if (e.type !== 'fixed') {
+    const stepSize = e.type === 'time' ? 5 : e.round;
+    const title = a.calib ? (e.type === 'time' ? 'Стартовое время' : 'Стартовый вес') : (e.type === 'time' ? 'Время' : 'Рабочий вес');
+    const hint = a.calib
+      ? `По плану ${loadLabel(e, it.plannedLoad)}. Поставь то, что реально делаешь на ${e.type === 'time' ? e.sets + ' подхода' : planLabel(e, {load:it.load, reps:it.targets}).split(' · ')[0]}.`
+      : `Шаг ${s.step + 1} из ${ladderLen(e)}${s.check ? ' · проверка нового веса' : ''}${prev ? ' · в прошлый раз ' + loadLabel(e, prev.load) : ''}`;
+    loadBlock = `<div class="c loadbox ${a.calib ? 'warn' : ''}">
+      <div class="m" style="${a.calib ? 'color:var(--accText)' : ''}">${title}${e.extra ? ' (доп. вес)' : ''}</div>
+      <div class="stepper"><button data-a="load" data-v="${-stepSize}">−</button><input id="loadIn" type="number" inputmode="decimal" step="${stepSize}" value="${it.load}"><button data-a="load" data-v="${stepSize}">+</button></div>
+      <div class="m" style="${a.calib ? 'color:var(--accText)' : ''}">${e.type === 'time' ? 'секунд' : 'кг'} · ${hint}</div>
+    </div>`;
+  }
+  const sets = it.targets.map((t, j) => `<div class="set"><span class="l">Подход ${j + 1}<div class="m">цель ${t} ${unit}</div></span>
+      <div class="stepper"><button data-a="rep" data-j="${j}" data-v="${e.type === 'time' ? -5 : -1}">−</button><input data-a="repin" data-j="${j}" type="number" inputmode="numeric" value="${it.done[j]}"><button data-a="rep" data-j="${j}" data-v="${e.type === 'time' ? 5 : 1}">+</button></div>
+      <button class="chk ${it.checked[j] ? 'on' : ''}" data-a="chk" data-j="${j}" aria-label="Подход выполнен"><i class="ti ti-check"></i></button></div>`).join('');
+  let reserve = '';
+  if (e.type !== 'fixed' && !e.noReserve) {
+    const opts = [[0, '0'], [1, '1'], [2, '2'], [3, '3+']];
+    reserve = `<div class="c"><div style="margin-bottom:8px">Сколько ещё ${e.type === 'time' ? 'мог простоять (по 5 с)' : 'повторов мог сделать'}?</div>
+      <div class="chips">${opts.map(([v, l]) => `<button data-a="res" data-v="${v}" class="${it.reserve === v ? 'on' : ''}">${l}</button>`).join('')}</div>
+      <div class="toggle ${it.tech ? 'on' : ''}" data-a="tech"><span class="box">${it.tech ? '<i class="ti ti-check" style="font-size:14px"></i>' : ''}</span>Техника поплыла</div></div>`;
+  } else if (e.noReserve) {
+    reserve = `<div class="c"><div class="toggle ${it.tech ? 'on' : ''}" data-a="tech" style="margin:0"><span class="box">${it.tech ? '<i class="ti ti-check" style="font-size:14px"></i>' : ''}</span>Техника поплыла</div></div>`;
+  }
+  let ladder = '';
+  if (e.type !== 'fixed' && !a.calib) {
+    const vals = ladderValues(e, s), n = vals.length;
+    ladder = `<div class="c"><div class="m" style="margin-bottom:6px">Лестница прогрессии${e.type === 'reps' ? ' · ' + loadLabel(e, s.weight) : ''}</div>
+      <div class="ladder">${vals.map((v, k) => `<div class="${k < s.step ? 'past' : k === s.step ? 'cur' : ''}" style="height:${25 + 75 * k / (n - 1)}%"></div>`).join('')}</div>
+      <div class="ll">${vals.map((v, k) => `<span class="${k === s.step ? 'cur' : ''}">${v}</span>`).join('')}</div></div>`;
+  }
+  const notes = [e.note, e.base ? '1–2 разминочных подхода перед рабочими — в счёт не идут' : null].filter(Boolean);
+  const isLast = i === a.items.length - 1;
+  return `
+  <div class="row" style="margin-bottom:8px"><button class="back" data-a="workout" aria-label="К списку"><i class="ti ti-arrow-left"></i></button><span class="m">${i + 1} из ${a.items.length}</span><button class="back" data-a="rest" aria-label="Таймер отдыха"><i class="ti ti-clock"></i></button></div>
+  <h2>${e.name}</h2>
+  <div class="m" style="margin:2px 0 10px">${e.base ? 'База' : e.type === 'time' ? 'На время' : 'Изоляция'} · отдых ${restLabel(e.rest)}</div>
+  ${notes.map(n => `<div class="m" style="margin:-4px 0 10px"><i class="ti ti-info-circle"></i> ${n}</div>`).join('')}
+  ${loadBlock}
+  <div class="c">${sets}</div>
+  ${reserve}
+  ${ladder}
+  <div class="row" style="gap:8px;margin-top:4px">
+    <button class="btn sec" data-a="skip" style="flex:1">${it.skipped ? 'Вернуть' : 'Пропустить'}</button>
+    <button class="btn" data-a="donex" style="flex:2"><i class="ti ti-check"></i> ${isLast ? 'Готово — к списку' : 'Готово — дальше'}</button>
+  </div>`;
+}
+
+function summary() {
+  const v = view.summary;
+  const icon = {up:['ti-trending-up', 'ok'], keep:['ti-equal', ''], back:['ti-trending-down', 'bad'], deload:['ti-arrow-back-up', 'bad'], skip:['ti-player-skip-forward', ''], fixed:['ti-minus', '']};
+  const rows = v.results.map(r => {
+    const e = EX[r.id], [ic, cls] = icon[r.d];
+    const bg = cls === 'ok' ? 'var(--okSoft)' : cls === 'bad' ? 'var(--badSoft)' : 'var(--off)';
+    const fg = cls === 'ok' ? 'var(--ok)' : cls === 'bad' ? 'var(--bad)' : 'var(--muted)';
+    return `<div class="c ex" style="cursor:default"><div class="sum-i" style="background:${bg};color:${fg}"><i class="ti ${ic}"></i></div><div class="n"><div>${e.name}</div><div class="m">${r.why}</div>${r.after ? `<div style="font-size:12px;margin-top:2px">Дальше: <b>${r.after}</b></div>` : ''}</div></div>`;
+  }).join('');
+  const ups = v.results.filter(r => r.d === 'up').length;
+  return `<h1>Тренировка готова</h1>
+  <div class="grid2"><div class="c"><div class="m">${DAY_NAME[v.day]}</div><div class="big">${v.calib ? 'Старт' : 'Готово'}</div></div><div class="c"><div class="m">Шаг вверх</div><div class="big o">${ups}</div></div></div>
+  ${v.calib ? '<div class="c warn">Стартовые веса сохранены. Дальше всё растёт по лестнице от них.</div>' : ''}
+  ${rows}
+  <button class="btn" data-a="home" style="margin-top:6px">На главную</button>`;
+}
+
+function metricOf(e, it) {
+  const sumDone = it.done.reduce((a, b) => a + b, 0);
+  if (e.type === 'time') return {v:it.load, u:'с'};
+  if (e.type === 'reps') return {v:sumDone, u:'повт', sub:loadLabel(e, it.load)};
+  if (e.type === 'fixed') return {v:sumDone, u:'повт'};
+  return {v:it.load, u:'кг'};
+}
+function progress() {
+  const h = state.history;
+  const weekAgo = Date.now() - 7 * 864e5;
+  let ton = 0;
+  for (const s of h) if (s.date >= weekAgo) for (const it of s.items) {
+    const e = EX[it.id];
+    if (e.type === 'weight' || (e.type === 'reps' && !e.extra)) ton += it.load * it.done.reduce((a, b) => a + b, 0);
+  }
+  const ups = h.reduce((a, s) => a + s.items.filter(i => i.d === 'up').length, 0);
+  const tabs = ALL.filter(e => e.type !== 'fixed').map(e => `<button data-a="pex" data-id="${e.id}" class="${view.progEx === e.id ? 'on' : ''}">${e.name}</button>`).join('');
+  const e = EX[view.progEx], s = state.ex[e.id];
+  const pts = h.flatMap(ss => ss.items.filter(it => it.id === e.id && !it.skipped).map(it => ({date:ss.date, ...metricOf(e, it), done:it.done})));
+  let chart = '<div class="m" style="padding:24px 0;text-align:center">Пока нет данных — сделай первую тренировку</div>';
+  if (pts.length) {
+    const W = 300, H = 120, pad = 14;
+    const vals = pts.map(p => p.v);
+    const goal = e.type === 'reps' ? e.repsSteps[e.repsSteps.length - 1].reduce((a, b) => a + b, 0) : (s.base + e.offs[e.offs.length - 1]);
+    const mx = Math.max(...vals, goal), mn = Math.min(...vals);
+    const lo = mn - (mx - mn || 10) * 0.15, hi = mx + (mx - mn || 10) * 0.1;
+    const x = k => pts.length === 1 ? W / 2 : pad + k * (W - 2 * pad) / (pts.length - 1);
+    const y = v => H - pad - (v - lo) / (hi - lo) * (H - 2 * pad);
+    chart = `<svg viewBox="0 0 ${W} ${H + 14}" width="100%">
+      <line x1="${pad}" x2="${W - pad}" y1="${y(goal)}" y2="${y(goal)}" stroke="var(--line)" stroke-dasharray="3 3"/>
+      <text x="${W - pad}" y="${y(goal) - 4}" text-anchor="end" font-size="10" fill="var(--muted)">цель цикла ${fmt(goal)}</text>
+      <polyline points="${pts.map((p, k) => x(k) + ',' + y(p.v)).join(' ')}" fill="none" stroke="var(--acc)" stroke-width="2.5" stroke-linejoin="round"/>
+      ${pts.map((p, k) => `<circle cx="${x(k)}" cy="${y(p.v)}" r="3.5" fill="var(--acc)"/>`).join('')}
+      <text x="${x(0)}" y="${H + 10}" font-size="10" fill="var(--muted)" text-anchor="${pts.length === 1 ? 'middle' : 'start'}">${fmt(pts[0].v)}</text>
+      ${pts.length > 1 ? `<text x="${x(pts.length - 1)}" y="${H + 10}" font-size="10" fill="var(--acc)" text-anchor="end">${fmt(pts[pts.length - 1].v)}</text>` : ''}
+    </svg>`;
+  }
+  const first = pts[0], lastP = pts[pts.length - 1];
+  const delta = pts.length > 1 ? lastP.v - first.v : 0;
+  const steps = ALL.filter(x => x.type !== 'fixed').map(x => {
+    const st = state.ex[x.id], n = ladderLen(x);
+    return `<div style="margin-bottom:9px"><div class="row" style="margin-bottom:4px"><span>${x.name}</span><span class="m">${planLabel(x, target(x, st))}</span></div><div class="bar"><div style="width:${100 * (st.step + 1) / n}%"></div></div></div>`;
+  }).join('');
+  const hist = pts.slice(-5).reverse().map(p => `<div class="row" style="font-size:12px;margin-bottom:3px"><span class="m">${new Date(p.date).toLocaleDateString('ru-RU', {day:'numeric', month:'short'})}</span><span>${p.sub ? p.sub + ' · ' : ''}${e.type === 'weight' ? fmt(p.v) + ' кг · ' : ''}${p.done.join('/')}</span></div>`).join('');
+  return `<h1>Прогресс</h1>
+  <div class="grid2">
+    <div class="c"><div class="m">Тренировок</div><div class="big">${h.length}</div></div>
+    <div class="c"><div class="m">Тоннаж за 7 дней</div><div class="big">${fmt(Math.round(ton / 100) / 10)} <span class="m">т</span></div></div>
+  </div>
+  <div class="tabs">${tabs}</div>
+  <div class="c">
+    <div class="row"><span style="font-weight:600">${e.name}</span>${delta ? `<span class="o">${delta > 0 ? '+' : ''}${fmt(delta)} ${lastP.u}</span>` : ''}</div>
+    <div class="m" style="margin-bottom:6px">${e.type === 'weight' ? 'рабочий вес, кг' : e.type === 'time' ? 'время, с' : 'сумма повторов'}</div>
+    ${chart}
+    ${hist ? `<div style="margin-top:8px">${hist}</div>` : ''}
+  </div>
+  <div class="grid2"><div class="c"><div class="m">Шагов вверх</div><div class="big o">${ups}</div></div><div class="c"><div class="m">Цикл</div><div class="big">${state.sessionIdx % 12} <span class="m">/ 12</span></div></div></div>
+  <div class="c"><div class="m" style="margin-bottom:8px">Где ты на лестнице</div>${steps}</div>`;
+}
+
+function programScreen() {
+  const block = day => PROGRAM[day].map(e => {
+    const s = state.ex[e.id];
+    if (e.type === 'fixed') return `<div class="c"><div>${e.name}</div><div class="m">${e.sets}×${e.reps} · ${e.note || 'без прогрессии'}</div></div>`;
+    const vals = ladderValues(e, s);
+    return `<div class="c"><div class="row"><span>${e.name}</span>${s.fails ? '<span class="badge bad">1 промах</span>' : s.check ? '<span class="badge">проверка</span>' : ''}</div>
+      <div class="m">${e.type === 'reps' ? loadLabel(e, s.weight) + ' · ' : e.type === 'time' ? e.sets + ' подх · с · ' : e.sets + '×' + e.reps + ' · кг · '}отдых ${restLabel(e.rest)}</div>
+      <div class="lad">${vals.map((v, k) => `<span class="${k < s.step ? 'past' : k === s.step ? 'cur' : ''}">${v}</span>`).join('')}</div></div>`;
+  }).join('');
+  return `<h1>Программа</h1>
+  <div class="c"><div style="font-weight:600;margin-bottom:6px">Правила прогрессии</div>
+    <div class="m" style="font-size:13px;line-height:1.55">
+    1. Все подходы чисто и запас ≥1 повтора — шаг вверх.<br>2. Не добрал — то же самое.<br>3. Два раза подряд не добрал — минус 10% и снова вверх.<br>4. Техника поплыла — вес не растёт.<br>5. Первая тренировка на новом весе — проверка: запас &lt;1 — откат на шаг.<br>Первые Д1 и Д2 — стартовые: вводишь реальный вес.</div></div>
+  <h2 style="margin:16px 0 8px">День 1</h2>${block('D1')}
+  <h2 style="margin:16px 0 8px">День 2</h2>${block('D2')}
+  <h2 style="margin:16px 0 8px">Данные</h2>
+  <div class="c">
+    <button class="btn sec sm" data-a="export" style="margin-bottom:8px"><i class="ti ti-copy"></i> Скопировать резервную копию</button>
+    <button class="btn sec sm" data-a="import" style="margin-bottom:8px"><i class="ti ti-upload"></i> Восстановить из копии</button>
+    <button class="btn sec sm" data-a="recal" style="margin-bottom:8px"><i class="ti ti-target-arrow"></i> Пройти стартовые тренировки заново</button>
+    <button class="btn sec sm" data-a="reset" style="color:var(--bad)"><i class="ti ti-trash"></i> Сбросить всё</button>
+    <div id="io"></div>
+    <div class="m" style="margin-top:8px">${inTg ? 'Данные синхронизируются через Telegram' : 'Данные хранятся в этом браузере'}</div>
+  </div>`;
+}
+
+function render() {
+  const app = document.getElementById('app');
+  let html, nav = true;
+  if (view.screen === 'workout' && state.active) { html = workout(); nav = false; }
+  else if (view.screen === 'ex' && state.active) { html = exScreen(); nav = false; }
+  else if (view.screen === 'summary') { html = summary(); nav = false; }
+  else { view.screen = null; html = view.tab === 'progress' ? progress() : view.tab === 'program' ? programScreen() : home(); }
+  const tabs = [['home', 'ti-flame', 'Сегодня'], ['progress', 'ti-chart-line', 'Прогресс'], ['program', 'ti-list-details', 'Программа']];
+  app.innerHTML = html + (nav ? `<div class="nav">${tabs.map(([k, ic, l]) => `<button data-a="tab" data-t="${k}" class="${view.tab === k ? 'on' : ''}"><i class="ti ${ic}"></i>${l}</button>`).join('')}</div>` : '');
+  app.style.paddingBottom = timer && !nav ? '100px' : '';
+}
+
+document.addEventListener('click', ev => {
+  const b = ev.target.closest('[data-a]');
+  if (!b || b.tagName === 'INPUT') return;
+  const a = b.dataset.a;
+  const act = state.active;
+  const it = act && view.screen === 'ex' ? act.items[view.exIdx] : null;
+  switch (a) {
+    case 'tab': view.tab = b.dataset.t; view.screen = null; render(); scrollTo(0, 0); return;
+    case 'start': startSession(); return;
+    case 'home': view.screen = null; view.tab = 'home'; render(); scrollTo(0, 0); return;
+    case 'workout': openWorkout(); return;
+    case 'ex': openEx(+b.dataset.i); return;
+    case 'next': openEx(view.exIdx + 1); return;
+    case 'donex': {
+      if (!it.skipped) it.checked = it.checked.map(() => true);
+      save(); haptic('medium');
+      if (view.exIdx < act.items.length - 1) openEx(view.exIdx + 1); else openWorkout();
+      return;
+    }
+    case 'finish': {
+      const left = act.items.filter(x => !x.skipped && !x.checked.every(Boolean)).length;
+      if (left) ask(`Не отмечено упражнений: ${left}. Неотмеченные подходы считаются невыполненными. Завершить?`, finishSession);
+      else finishSession();
+      return;
+    }
+    case 'cancel': ask('Отменить тренировку? Отметки удалятся, прогрессия не изменится.', () => { state.active = null; save(); stopTimer(); view.screen = null; render(); }); return;
+    case 'load': {
+      const e = EX[it.id];
+      it.load = Math.max(0, Math.round((it.load + +b.dataset.v) * 100) / 100);
+      if (e.type === 'time') { it.targets = it.targets.map(() => it.load); it.done = it.done.map((v, j) => it.checked[j] ? v : it.load); }
+      save(); render(); haptic(); return;
+    }
+    case 'rep': { const j = +b.dataset.j; it.done[j] = Math.max(0, it.done[j] + +b.dataset.v); save(); render(); haptic(); return; }
+    case 'chk': {
+      const j = +b.dataset.j; it.checked[j] = !it.checked[j];
+      if (it.checked[j]) { haptic('medium'); if (j < it.targets.length - 1 || view.exIdx < act.items.length - 1) startTimer(EX[it.id].rest); }
+      save(); render(); return;
+    }
+    case 'res': it.reserve = +b.dataset.v; save(); render(); haptic(); return;
+    case 'tech': it.tech = !it.tech; save(); render(); return;
+    case 'skip': it.skipped = !it.skipped; save(); if (it.skipped && view.exIdx < act.items.length - 1) openEx(view.exIdx + 1); else render(); return;
+    case 'rest': startTimer(EX[it.id].rest); return;
+    case 't30': if (timer) { timer.end += 30000; timer.total += 30; tickTimer(); } return;
+    case 'tstop': stopTimer(); render(); return;
+    case 'pex': view.progEx = b.dataset.id; render(); return;
+    case 'export': {
+      const s = JSON.stringify(state);
+      const io = document.getElementById('io');
+      io.innerHTML = `<textarea readonly style="margin-top:8px">${esc(s)}</textarea>`;
+      io.querySelector('textarea').select();
+      try { navigator.clipboard.writeText(s); io.insertAdjacentHTML('beforeend', '<div class="m">Скопировано</div>'); } catch (e) {}
+      return;
+    }
+    case 'import': {
+      const io = document.getElementById('io');
+      io.innerHTML = `<textarea id="impT" placeholder="Вставь сюда резервную копию" style="margin-top:8px"></textarea><button class="btn sm" data-a="doimport" style="margin-top:6px">Восстановить</button>`;
+      return;
+    }
+    case 'doimport': {
+      try { const s = JSON.parse(document.getElementById('impT').value); if (s.version !== 1) throw 0; state = migrate(s); save(); render(); say('Восстановлено'); }
+      catch (e) { say('Не похоже на резервную копию'); }
+      return;
+    }
+    case 'recal': ask('Следующие Д1 и Д2 снова станут стартовыми: введёшь реальный вес, лестница начнётся от него.', () => { state.calibrated = {D1:false, D2:false}; save(); render(); }); return;
+    case 'reset': ask('Удалить всю историю и начать с нуля?', () => { state = freshState(); save(); view = {tab:'home', screen:null, exIdx:0, progEx:'bench', summary:null}; stopTimer(); render(); }); return;
+  }
+});
+document.addEventListener('change', ev => {
+  const el = ev.target;
+  const act = state.active;
+  if (!act || view.screen !== 'ex') return;
+  const it = act.items[view.exIdx], e = EX[it.id];
+  const v = parseFloat(String(el.value).replace(',', '.'));
+  if (isNaN(v) || v < 0) { render(); return; }
+  if (el.id === 'loadIn') {
+    it.load = Math.round(v * 100) / 100;
+    if (e.type === 'time') { it.targets = it.targets.map(() => it.load); it.done = it.done.map((d, j) => it.checked[j] ? d : it.load); }
+  } else if (el.dataset.a === 'repin') it.done[+el.dataset.j] = Math.round(v);
+  save(); render();
+});
+
+if (state.active) view.screen = 'workout';
+render();
+cloudLoad();
+</script>
+</body>
+</html>
