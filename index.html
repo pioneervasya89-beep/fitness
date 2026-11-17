@@ -235,7 +235,7 @@ if (tg) { try { tg.ready(); tg.expand(); } catch (e) {} }
 const dark = inTg ? tg.colorScheme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
 document.documentElement.classList.toggle('dark', dark);
 if (inTg) { try { tg.setHeaderColor(dark ? '#16110d' : '#fff8f2'); tg.setBackgroundColor(dark ? '#16110d' : '#fff8f2'); } catch (e) {} }
-const API_URL = '';
+const API_URL = 'https://fitness-sync.fitness-sync.workers.dev';
 const IS_LOCAL = /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
 const API = IS_LOCAL ? (localStorage.getItem('dev_api') || '') : API_URL;
 const INIT = IS_LOCAL ? (localStorage.getItem('dev_init') || '') : (inTg ? tg.initData : '');
