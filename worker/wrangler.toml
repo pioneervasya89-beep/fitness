@@ -1,0 +1,12 @@
+name = "fitness-sync"
+main = "src/index.js"
+compatibility_date = "2025-10-01"
+
+[vars]
+APP_URL = "https://pioneervasya89-beep.github.io/fitness/"
+ALLOWED_ORIGIN = "https://pioneervasya89-beep.github.io"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "fitness-sync"
+database_id = "00000000-0000-0000-0000-000000000000"

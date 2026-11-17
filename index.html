@@ -158,7 +158,7 @@ const DAY_SUB = {D1:'Ноги, грудь, спина, плечи', D2:'Спин
 const ALL = [...PROGRAM.D1, ...PROGRAM.D2];
 const EX = Object.fromEntries(ALL.map(e => [e.id, e]));
 const KEY = 'fitprog_v1';
-const APP_VERSION = '2026-11-17b';
+const APP_VERSION = '2026-11-17c';
 
 const QUOTES = [
   'Сила — это сумма скучных тренировок, которые ты не пропустил.',
@@ -235,7 +235,13 @@ if (tg) { try { tg.ready(); tg.expand(); } catch (e) {} }
 const dark = inTg ? tg.colorScheme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
 document.documentElement.classList.toggle('dark', dark);
 if (inTg) { try { tg.setHeaderColor(dark ? '#16110d' : '#fff8f2'); tg.setBackgroundColor(dark ? '#16110d' : '#fff8f2'); } catch (e) {} }
-const userName = inTg && tg.initDataUnsafe && tg.initDataUnsafe.user ? tg.initDataUnsafe.user.first_name : '';
+const API_URL = '';
+const IS_LOCAL = /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
+const API = IS_LOCAL ? (localStorage.getItem('dev_api') || '') : API_URL;
+const INIT = IS_LOCAL ? (localStorage.getItem('dev_init') || '') : (inTg ? tg.initData : '');
+const ME = (() => { try { const u = JSON.parse(new URLSearchParams(INIT).get('user')); if (u && u.id) return u; } catch (e) {} return inTg && tg.initDataUnsafe && tg.initDataUnsafe.user ? tg.initDataUnsafe.user : null; })();
+const syncOn = () => !!(API && INIT && ME);
+const userName = ME ? ME.first_name : '';
 
 const fmt = n => n == null ? '' : String(Math.round(n * 100) / 100).replace('.', ',');
 const roundTo = (x, r) => Math.round(x / r) * r;
@@ -408,22 +414,34 @@ function tonnage(items) {
   return t;
 }
 
-/* ---------- storage ---------- */
-let state = load();
+/* ---------- storage & sync ---------- */
+let sync = {clients:[], coaches:[], status: syncOn() ? 'wait' : 'local'};
+let who = ME ? ME.id : 0;
+try { const w = +localStorage.getItem('fit_who'); if (ME && w && w !== ME.id) who = w; } catch (e) {}
+const keyFor = uid => (!ME || uid === ME.id) ? KEY : KEY + '_c' + uid;
+let meta = (() => { try { return JSON.parse(localStorage.getItem('fitsync_meta')) || {}; } catch (e) { return {}; } })();
+const saveMeta = () => { try { localStorage.setItem('fitsync_meta', JSON.stringify(meta)); } catch (e) {} };
+let state = load(who);
 let view = {tab:'home', screen:null, exIdx:0, progEx:'bench', summary:null};
 let timer = null;
-function load() {
-  try { const s = JSON.parse(localStorage.getItem(KEY)); if (s && s.version === 1) return migrate(s); } catch (e) {}
+function load(uid) {
+  try { const s = JSON.parse(localStorage.getItem(keyFor(uid))); if (s && s.version === 1) return migrate(s); } catch (e) {}
   return freshState();
 }
 function migrate(s) { for (const e of ALL) if (!s.ex[e.id]) s.ex[e.id] = initEx(e); s.ach = s.ach || {}; return s; }
-let cloudT = null;
-function save() {
+function persistLocal() { try { localStorage.setItem(keyFor(who), JSON.stringify(state)); } catch (e) {} }
+const isSelf = () => !ME || who === ME.id;
+let cloudT = null, editSeq = 0, pendingNotify = null;
+function save(notify) {
   state.updated = Date.now();
-  const str = JSON.stringify(state);
-  try { localStorage.setItem(KEY, str); } catch (e) {}
-  clearTimeout(cloudT);
-  cloudT = setTimeout(() => cloudSave(str), 800);
+  if (state.active && view.screen === 'ex' && state.active.items[view.exIdx]) state.active.items[view.exIdx].t = Date.now();
+  persistLocal();
+  if (syncOn()) {
+    if (notify) pendingNotify = {uid:who, payload:notify};
+    meta[who] = meta[who] || {v:0}; meta[who].dirty = true; saveMeta(); editSeq++;
+    schedulePush(500);
+  }
+  if (isSelf()) { clearTimeout(cloudT); const str = JSON.stringify(state); cloudT = setTimeout(() => cloudSave(str), 800); }
 }
 function cloudOk() { return inTg && tg.CloudStorage && tg.isVersionAtLeast && tg.isVersionAtLeast('6.9'); }
 function cloudSave(str) {
@@ -438,20 +456,161 @@ function cloudLoad() {
   if (!cloudOk()) return;
   try {
     tg.CloudStorage.getItem('meta', (err, v) => {
-      if (err || !v) return;
-      const meta = JSON.parse(v);
-      if (meta.updated <= (state.updated || 0)) return;
-      const keys = Array.from({length:meta.n}, (_, i) => 'p' + i);
+      if (err || !v || !isSelf()) return;
+      const m = JSON.parse(v);
+      if (m.updated <= (state.updated || 0)) return;
+      const keys = Array.from({length:m.n}, (_, i) => 'p' + i);
       tg.CloudStorage.getItems(keys, (err2, vals) => {
-        if (err2) return;
+        if (err2 || !isSelf()) return;
         try {
           const s = JSON.parse(keys.map(k => vals[k]).join(''));
-          if (s && s.version === 1) { state = migrate(s); localStorage.setItem(KEY, JSON.stringify(state)); render(); }
+          if (s && s.version === 1) { state = migrate(merge(state, s)); save(); rerender(); }
         } catch (e) {}
       });
     });
   } catch (e) {}
 }
+
+// Merge two copies of the same athlete's state (local edits vs server).
+// A finished workout (higher sessionIdx) wins wholesale; otherwise newer per-set and per-exercise edits win.
+function merge(L, R) {
+  if (!R) return L;
+  if (!L) return migrate(R);
+  const ach = Object.assign({}, R.ach, L.ach);
+  if (L.sessionIdx !== R.sessionIdx) {
+    const W = JSON.parse(JSON.stringify(L.sessionIdx > R.sessionIdx ? L : R));
+    W.ach = ach;
+    return migrate(W);
+  }
+  const M = JSON.parse(JSON.stringify(R));
+  M.ach = ach;
+  for (const id in L.ex) if ((L.ex[id].t || 0) > ((M.ex[id] || {}).t || 0)) M.ex[id] = L.ex[id];
+  if ((L.calT || 0) > (R.calT || 0)) { M.calibrated = L.calibrated; M.calT = L.calT; }
+  const la = L.active, ra = R.active;
+  if (la && ra && la.started === ra.started) {
+    M.active.items = ra.items.map((ri, k) => { const li = la.items[k]; return li && (li.t || 0) > (ri.t || 0) ? li : ri; });
+  } else if (la || ra) {
+    M.active = (L.activeT || 0) > (R.activeT || 0) ? la : ra;
+    M.activeT = Math.max(L.activeT || 0, R.activeT || 0);
+  }
+  return migrate(M);
+}
+
+async function api(method, path, body) {
+  const r = await fetch(API + path, {method, headers:{'Content-Type':'application/json', 'X-Init-Data':INIT}, body: body ? JSON.stringify(body) : undefined});
+  let b = null;
+  try { b = await r.json(); } catch (e) {}
+  return {status:r.status, body:b};
+}
+const SYNC_UI = {ok:['ti-cloud-check', 'var(--ok)', 'Синхронизировано'], wait:['ti-cloud-upload', 'var(--muted)', 'Синхронизация…'], offline:['ti-cloud-off', 'var(--bad)', 'Нет связи — всё сохранено в телефоне и отправится позже'], err:['ti-cloud-x', 'var(--bad)', 'Ошибка синхронизации'], local:['ti-device-mobile', 'var(--muted)', 'Только на этом устройстве']};
+function syncDot() { const m = SYNC_UI[sync.status]; return `<span class="syncdot" style="color:${m[1]}" title="${m[2]}"><i class="ti ${m[0]}"></i></span>`; }
+function setSync(st) {
+  if (sync.status === st) return;
+  sync.status = st;
+  document.querySelectorAll('.syncdot').forEach(el => { el.outerHTML = syncDot(); });
+  document.querySelectorAll('.synctext').forEach(el => { el.textContent = SYNC_UI[st][2]; });
+}
+let pendingRender = false;
+function applyRemote(s) {
+  state = migrate(s);
+  persistLocal();
+  if (!state.active && timer) stopTimer();
+  const ae = document.activeElement;
+  if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA')) { pendingRender = true; return; }
+  rerender();
+}
+let pushing = false, pulling = false, pushT = null;
+function schedulePush(d) { clearTimeout(pushT); pushT = setTimeout(push, d); }
+async function push() {
+  if (!syncOn()) return;
+  if (pushing || pulling) { schedulePush(800); return; }
+  const uid = who;
+  if (!meta[uid] || !meta[uid].dirty) return;
+  pushing = true; setSync('wait');
+  try {
+    for (let i = 0; i < 4 && uid === who; i++) {
+      const seq = editSeq;
+      const note = pendingNotify && pendingNotify.uid === uid ? pendingNotify : null;
+      const body = {baseVersion:meta[uid].v || 0, data:state};
+      if (note) body.notify = note.payload;
+      const r = await api('PUT', '/api/state?uid=' + uid, body);
+      if (r.status === 200) {
+        if (note && pendingNotify === note) pendingNotify = null;
+        meta[uid].v = r.body.version;
+        if (editSeq === seq) meta[uid].dirty = false;
+        saveMeta(); setSync('ok');
+        break;
+      }
+      if (r.status === 409 && uid === who) {
+        if (r.body && r.body.data) applyRemote(merge(state, r.body.data));
+        meta[uid].v = r.body ? r.body.version : 0; saveMeta();
+        continue;
+      }
+      setSync(r.status === 401 ? 'err' : 'err');
+      break;
+    }
+  } catch (e) { setSync('offline'); }
+  pushing = false;
+  if (uid === who && meta[uid] && meta[uid].dirty && sync.status === 'ok') schedulePush(300);
+}
+async function pull() {
+  if (!syncOn() || pushing || pulling) return;
+  pulling = true;
+  const uid = who;
+  try {
+    const m = meta[uid];
+    const r = await api('GET', `/api/state?uid=${uid}&since=${m ? m.v : -1}`);
+    if (uid !== who) return;
+    if (r.status !== 200) { setSync('err'); return; }
+    setSync('ok');
+    if (r.body.unchanged) return;
+    if (!r.body.data) { meta[uid] = {v:0, dirty:true}; saveMeta(); schedulePush(0); return; }
+    const hasLocal = state.history.length > 0 || !!state.active;
+    if ((m && m.dirty) || (!m && hasLocal)) {
+      applyRemote(merge(state, r.body.data));
+      meta[uid] = {v:r.body.version, dirty:true}; saveMeta(); schedulePush(0);
+    } else {
+      applyRemote(r.body.data);
+      meta[uid] = {v:r.body.version, dirty:false}; saveMeta();
+    }
+  } catch (e) { setSync('offline'); }
+  finally { pulling = false; }
+}
+async function loadMe() {
+  if (!syncOn()) return;
+  try {
+    const r = await api('GET', '/api/me');
+    if (r.status !== 200) { setSync('err'); return; }
+    sync.clients = r.body.clients || []; sync.coaches = r.body.coaches || [];
+    if (who !== ME.id && !sync.clients.some(c => c.id === who)) { switchTo(ME.id); return; }
+    if (!view.screen) rerender();
+  } catch (e) { setSync('offline'); }
+}
+function switchTo(uid) {
+  if (uid === who) return;
+  who = uid;
+  try { localStorage.setItem('fit_who', String(uid)); } catch (e) {}
+  state = load(uid); stopTimer();
+  view.screen = state.active ? 'workout' : null; view.tab = 'home'; view.editEx = null;
+  render(); scrollTo(0, 0);
+  pull();
+}
+const clientName = c => c.first_name || (c.username ? '@' + c.username : 'Подопечный');
+function whoName() {
+  if (isSelf()) return null;
+  const c = sync.clients.find(x => x.id === who);
+  return c ? clientName(c) : 'Подопечный';
+}
+let tickN = 0;
+setInterval(() => {
+  if (!syncOn() || document.hidden) return;
+  tickN++;
+  if (meta[who] && meta[who].dirty) { if (!pushing) push(); return; }
+  if (state.active || view.screen === 'summary' || tickN % 5 === 0) pull();
+  if (tickN % 40 === 0) loadMe();
+}, 3000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) { pull(); loadMe(); } });
+document.addEventListener('focusout', () => { if (pendingRender) setTimeout(() => { const ae = document.activeElement; if (pendingRender && !(ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA'))) { pendingRender = false; rerender(); } }, 50); });
 
 /* ---------- session flow ---------- */
 function currentDay(idx) { return idx % 2 === 0 ? 'D1' : 'D2'; }
@@ -461,12 +620,13 @@ function startSession() {
   const day = currentDay(state.sessionIdx);
   const calib = !state.calibrated[day];
   state.active = {
-    day, calib, idx:state.sessionIdx, started:Date.now(),
+    day, calib, idx:state.sessionIdx, started:Date.now(), by:ME ? ME.id : 0,
     items: PROGRAM[day].map(e => {
       const t = target(e, state.ex[e.id]);
       return {id:e.id, load:t.load, plannedLoad:t.load, targets:t.reps, done:[...t.reps], checked:t.reps.map(() => false), reserve:null, tech:false, skipped:false};
     })
   };
+  state.activeT = Date.now();
   save(); haptic('medium'); openWorkout();
 }
 function openWorkout() { view.screen = 'workout'; render(); scrollTo(0, 0); }
@@ -489,7 +649,11 @@ function finishSession() {
   state.sessionIdx++;
   state.active = null;
   const fresh = checkAchievements();
-  save();
+  const ton = tonnage(items);
+  const marks = {up:'↑', keep:'=', back:'↓', deload:'↓ −10%', skip:'—'};
+  const summaryText = `${DAY_NAME[a.day]}${a.calib ? ' (стартовая)' : ''} · ${duration} мин · тоннаж ${fmt(Math.round(ton / 10) / 100)} т\n\n` +
+    results.filter(r => r.d !== 'fixed').map(r => `${marks[r.d]} ${EX[r.id].name}${r.pr ? ' ⚡ рекорд' : ''}${r.after && r.d !== 'skip' ? ' → ' + r.after : ''}`).join('\n');
+  save({summary:summaryText, whoop:sessionText(state.history[state.history.length - 1])});
   try { inTg && tg.HapticFeedback.notificationOccurred('success'); } catch (e) {}
   stopTimer();
   view.screen = 'summary';
@@ -540,6 +704,8 @@ function restLabel(sec) { return sec >= 180 ? '3 мин' : sec >= 150 ? '2–3 �
 function greeting() {
   const h = new Date().getHours();
   const g = h < 5 ? 'Доброй ночи' : h < 12 ? 'Доброе утро' : h < 18 ? 'Добрый день' : 'Добрый вечер';
+  const wn = whoName();
+  if (wn) return '<i class="ti ti-user-check"></i> Режим тренера · ' + esc(wn);
   return g + (userName ? ', ' + esc(userName) : '');
 }
 function home() {
@@ -621,7 +787,7 @@ function workout() {
   const mins = Math.round((Date.now() - a.started) / 60000);
   const cheer = done === 0 ? 'Поехали! Начни с разминки.' : done < total / 2 ? 'Хороший темп, продолжай.' : done < total ? 'Больше половины позади!' : 'Всё сделано — жми «Завершить»!';
   return `<div class="screen">
-  <div class="row" style="margin-bottom:8px"><button class="back" data-a="home" aria-label="Назад"><i class="ti ti-arrow-left"></i></button><span class="m"><i class="ti ti-clock"></i> ${mins} мин</span><span class="m">${done} / ${total}</span></div>
+  <div class="row" style="margin-bottom:8px"><button class="back" data-a="home" aria-label="Назад"><i class="ti ti-arrow-left"></i></button><span class="m"><i class="ti ti-clock"></i> ${mins} мин ${syncOn() ? syncDot() : ''}</span><span class="m">${done} / ${total}</span></div>
   <h1 style="margin-bottom:2px">${DAY_NAME[a.day]}</h1>
   <div class="m" style="margin-bottom:10px">${a.calib ? 'Стартовая — открой упражнение и поставь реальный вес' : cheer}</div>
   <div class="bar" style="margin-bottom:12px"><div style="width:${100 * done / total}%"></div></div>
@@ -781,25 +947,43 @@ function programScreen() {
     const s = state.ex[e.id];
     if (e.type === 'fixed') return `<div class="c ex" style="cursor:default"><div class="thumb">${body(e.zones)}</div><div class="n"><div class="nm">${e.name}</div><div class="m">${e.sets}×${e.reps} · ${e.note || 'без прогрессии'}</div></div></div>`;
     const vals = ladderValues(e, s);
-    return `<div class="c ex" style="cursor:default;align-items:flex-start"><div class="thumb">${body(e.zones)}</div><div class="n"><div class="row"><span class="nm">${e.name}</span>${s.fails ? '<span class="badge bad">1 промах</span>' : s.check ? '<span class="badge">проверка</span>' : ''}</div>
+    const cur = target(e, s).load;
+    const editor = view.editEx === e.id ? `<div style="margin-top:8px"><div class="m">${e.type === 'time' ? 'Время, с' : e.extra ? 'Доп. вес, кг' : 'Рабочий вес, кг'} на текущем шаге</div>
+      <div class="stepper" style="margin:6px 0"><button data-a="editv" data-v="${-(e.type === 'time' ? 5 : e.round)}">−</button><input value="${fmt(view.editVal)}" readonly><button data-a="editv" data-v="${e.type === 'time' ? 5 : e.round}">+</button></div>
+      <div class="row" style="gap:6px"><button class="btn sm" data-a="editsave">Сохранить</button><button class="btn sec sm" data-a="editcancel">Отмена</button></div></div>` : '';
+    return `<div class="c ex" style="cursor:default;align-items:flex-start"><div class="thumb">${body(e.zones)}</div><div class="n"><div class="row"><span class="nm">${e.name}</span><span>${s.fails ? '<span class="badge bad">1 промах</span> ' : s.check ? '<span class="badge">проверка</span> ' : ''}${view.editEx === e.id ? '' : `<button class="back" data-a="editw" data-id="${e.id}" aria-label="Изменить вес" style="font-size:18px;color:var(--muted)"><i class="ti ti-pencil"></i></button>`}</span></div>
       <div class="m">${e.type === 'reps' ? loadLabel(e, s.weight) + ' · ' : e.type === 'time' ? e.sets + ' подх · с · ' : e.sets + '×' + e.reps + ' · кг · '}отдых ${restLabel(e.rest)}</div>
-      <div class="lad">${vals.map((v, k) => `<span class="${k < s.step ? 'past' : k === s.step ? 'cur' : ''}">${v}</span>`).join('')}</div></div></div>`;
+      <div class="lad">${vals.map((v, k) => `<span class="${k < s.step ? 'past' : k === s.step ? 'cur' : ''}">${v}</span>`).join('')}</div>${editor}</div></div>`;
   }).join('');
-  return `<div class="screen"><h1>Программа</h1>
+  return `<div class="screen"><h1>Программа${whoName() ? ' <span class="m">· ' + esc(whoName()) + '</span>' : ''}</h1>
   <div class="c"><div style="font-weight:700;margin-bottom:6px"><i class="ti ti-stairs-up o"></i> Правила прогрессии</div>
     <div class="m" style="font-size:13px;line-height:1.6">
     1. Все подходы чисто и запас ≥1 повтора — шаг вверх.<br>2. Не добрал — то же самое.<br>3. Два раза подряд не добрал — минус 10% и снова вверх.<br>4. Техника поплыла — вес не растёт.<br>5. Первая тренировка на новом весе — проверка: запас &lt;1 — откат на шаг.<br>Первые Д1 и Д2 — стартовые: вводишь реальный вес.</div></div>
   <h3>День 1 <span class="m">${DAY_SUB.D1}</span></h3>${block('D1')}
   <h3>День 2 <span class="m">${DAY_SUB.D2}</span></h3>${block('D2')}
+  ${coachSection()}
   <h3>Данные</h3>
   <div class="c">
     <button class="btn sec sm" data-a="export" style="margin-bottom:8px"><i class="ti ti-copy"></i> Скопировать резервную копию</button>
-    <button class="btn sec sm" data-a="import" style="margin-bottom:8px"><i class="ti ti-upload"></i> Восстановить из копии</button>
     <button class="btn sec sm" data-a="recal" style="margin-bottom:8px"><i class="ti ti-target-arrow"></i> Пройти стартовые тренировки заново</button>
-    <button class="btn sec sm" data-a="reset" style="color:var(--bad)"><i class="ti ti-trash"></i> Сбросить всё</button>
+    ${isSelf() ? `<button class="btn sec sm" data-a="import" style="margin-bottom:8px"><i class="ti ti-upload"></i> Восстановить из копии</button>
+    <button class="btn sec sm" data-a="reset" style="color:var(--bad)"><i class="ti ti-trash"></i> Сбросить всё</button>` : ''}
     <div id="io"></div>
-    <div class="m" style="margin-top:8px">${inTg ? 'Данные синхронизируются через Telegram' : 'Данные хранятся в этом браузере'} · версия ${APP_VERSION}</div>
+    <div class="m" style="margin-top:8px">${syncOn() ? 'Данные на сервере, доступны тренеру' : inTg ? 'Данные синхронизируются через Telegram' : 'Данные хранятся в этом браузере'} · версия ${APP_VERSION}</div>
   </div></div>`;
+}
+
+function coachSection() {
+  if (!syncOn()) return `<h3>Тренер</h3><div class="c m">Совместная работа с тренером доступна, когда приложение открыто из Telegram.</div>`;
+  let h = `<h3>Тренер и синхронизация</h3><div class="c"><div class="row" style="justify-content:flex-start">${syncDot()}<span class="synctext m">${SYNC_UI[sync.status][2]}</span></div>`;
+  if (isSelf()) {
+    h += `<div style="margin-top:12px;font-weight:700">Мои тренеры</div>` + (sync.coaches.length
+      ? sync.coaches.map(c => `<div class="row" style="margin-top:6px"><span>${esc(clientName(c))}</span><button class="btn sec sm" data-a="rmcoach" data-id="${c.id}" style="width:auto">Отключить</button></div>`).join('')
+      : '<div class="m">Пока нет. Пригласи тренера — он сможет отмечать твои подходы и менять веса со своего телефона.</div>');
+    h += `<button class="btn sm" data-a="invite" style="margin-top:10px"><i class="ti ti-user-plus"></i> Пригласить тренера</button><div id="inv"></div>`;
+  }
+  if (sync.clients.length) h += `<div style="margin-top:12px;font-weight:700">Мои подопечные</div>` + sync.clients.map(c => `<div class="row" style="margin-top:6px"><span>${esc(clientName(c))}</span><button class="btn sec sm" data-a="rmclient" data-id="${c.id}" style="width:auto">Убрать</button></div>`).join('');
+  return h + '</div>';
 }
 
 function render() {
@@ -808,9 +992,15 @@ function render() {
   if (view.screen === 'workout' && state.active) { html = workout(); nav = false; }
   else if (view.screen === 'ex' && state.active) { html = exScreen(); nav = false; }
   else if (view.screen === 'summary') { html = summary(); nav = false; }
-  else { view.screen = null; html = view.tab === 'progress' ? progress() : view.tab === 'program' ? programScreen() : home(); }
+  else { view.screen = null; html = profileBar() + (view.tab === 'progress' ? progress() : view.tab === 'program' ? programScreen() : home()); }
+  if (!nav && whoName()) html = `<div class="badge" style="display:block;text-align:center;margin-bottom:10px;padding:6px"><i class="ti ti-user-check"></i> Режим тренера · ${esc(whoName())}</div>` + html;
   const tabs = [['home', 'ti-flame', 'Сегодня'], ['progress', 'ti-chart-line', 'Прогресс'], ['program', 'ti-list-details', 'Программа']];
   app.innerHTML = html + (nav ? `<div class="nav">${tabs.map(([k, ic, l]) => `<button data-a="tab" data-t="${k}" class="${view.tab === k ? 'on' : ''}"><i class="ti ${ic}"></i>${l}</button>`).join('')}</div>` : '');
+}
+function profileBar() {
+  if (!syncOn() || !sync.clients.length) return '';
+  const chips = [{id:ME.id, name:'Я'}, ...sync.clients.map(c => ({id:c.id, name:clientName(c)}))];
+  return `<div class="tabs" style="margin-bottom:12px">${chips.map(c => `<button data-a="who" data-id="${c.id}" class="${c.id === who ? 'on' : ''}">${c.id === ME.id ? '<i class="ti ti-user"></i> ' : '<i class="ti ti-user-check"></i> '}${esc(c.name)}</button>`).join('')}</div>`;
 }
 function rerender() { const y = scrollY; render(); app.querySelector('.screen') && app.querySelector('.screen').classList.remove('screen'); scrollTo(0, y); }
 
@@ -837,7 +1027,33 @@ document.addEventListener('click', ev => {
       else finishSession();
       return;
     }
-    case 'cancel': ask('Отменить тренировку? Отметки удалятся, прогрессия не изменится.', () => { state.active = null; save(); stopTimer(); view.screen = null; render(); }); return;
+    case 'cancel': ask('Отменить тренировку? Отметки удалятся, прогрессия не изменится.', () => { state.active = null; state.activeT = Date.now(); save(); stopTimer(); view.screen = null; render(); }); return;
+    case 'who': switchTo(+b.dataset.id); haptic(); return;
+    case 'editw': { const e = EX[b.dataset.id]; view.editEx = e.id; view.editVal = target(e, state.ex[e.id]).load; rerender(); return; }
+    case 'editv': view.editVal = Math.max(0, Math.round((view.editVal + +b.dataset.v) * 100) / 100); rerender(); return;
+    case 'editcancel': view.editEx = null; rerender(); return;
+    case 'editsave': {
+      const e = EX[view.editEx], st = state.ex[e.id];
+      if (e.type === 'reps') st.weight = view.editVal; else st.base = view.editVal - e.offs[st.step];
+      st.fails = 0; st.check = false; st.t = Date.now();
+      view.editEx = null; save(); rerender(); haptic('medium'); return;
+    }
+    case 'invite': {
+      const el = document.getElementById('inv');
+      el.innerHTML = '<div class="m" style="margin-top:8px">Создаю ссылку…</div>';
+      api('POST', '/api/invite').then(r => {
+        if (r.status !== 200 || !r.body.link) throw 0;
+        el.innerHTML = `<div class="c" style="margin:10px 0 0;background:var(--off)"><div class="m">Одноразовая ссылка, действует 7 дней:</div><div style="word-break:break-all;font-weight:600;margin:4px 0 8px">${esc(r.body.link)}</div><button class="btn sm" data-a="shareinv" data-link="${esc(r.body.link)}"><i class="ti ti-send"></i> Отправить тренеру</button></div>`;
+      }).catch(() => { el.innerHTML = '<div class="m" style="color:var(--bad);margin-top:8px">Не получилось. Проверь интернет и попробуй ещё раз.</div>'; });
+      return;
+    }
+    case 'shareinv': {
+      const url = 'https://t.me/share/url?url=' + encodeURIComponent(b.dataset.link) + '&text=' + encodeURIComponent('Стань моим тренером: открой ссылку, и ты сможешь отмечать мои тренировки');
+      if (inTg) tg.openTelegramLink(url); else window.open(url, '_blank');
+      return;
+    }
+    case 'rmcoach': ask('Отключить тренера? Он больше не сможет видеть и отмечать твои тренировки.', () => { api('DELETE', '/api/link?coach=' + b.dataset.id).then(loadMe); }); return;
+    case 'rmclient': { const id = +b.dataset.id; ask('Убрать подопечного из списка?', () => { api('DELETE', '/api/link?client=' + id).then(() => { if (who === id) switchTo(ME.id); loadMe(); }); }); return; }
     case 'load': {
       const e = EX[it.id];
       it.load = Math.max(0, Math.round((it.load + +b.dataset.v) * 100) / 100);
@@ -875,7 +1091,7 @@ document.addEventListener('click', ev => {
       try { const s = JSON.parse(document.getElementById('impT').value); if (s.version !== 1) throw 0; state = migrate(s); save(); render(); say('Восстановлено'); }
       catch (e) { say('Не похоже на резервную копию'); }
       return;
-    case 'recal': ask('Следующие Д1 и Д2 снова станут стартовыми: введёшь реальный вес, лестница начнётся от него.', () => { state.calibrated = {D1:false, D2:false}; save(); render(); }); return;
+    case 'recal': ask('Следующие Д1 и Д2 снова станут стартовыми: введёшь реальный вес, лестница начнётся от него.', () => { state.calibrated = {D1:false, D2:false}; state.calT = Date.now(); save(); render(); }); return;
     case 'reset': ask('Удалить всю историю и начать с нуля?', () => { state = freshState(); save(); view = {tab:'home', screen:null, exIdx:0, progEx:'bench', summary:null}; stopTimer(); render(); }); return;
   }
 });
@@ -895,10 +1111,22 @@ document.addEventListener('change', ev => {
 if (state.active) view.screen = 'workout';
 render();
 cloudLoad();
+const inviteCode = new URLSearchParams(location.search).get('invite');
+async function acceptInvite(code) {
+  try {
+    const r = await api('POST', '/api/accept', {code});
+    const clean = new URL(location.href); clean.searchParams.delete('invite'); history.replaceState(null, '', clean.pathname + clean.search + location.hash);
+    if (r.status === 200) { await loadMe(); switchTo(r.body.client.id); say(`Готово! Теперь ты тренер: ${clientName(r.body.client)}. Переключаться между подопечными можно вверху экрана.`); }
+    else if (r.body && r.body.error === 'own_invite') say('Это твоё собственное приглашение — его нужно отправить тренеру.');
+    else say('Приглашение устарело или уже использовано. Попроси новое.');
+  } catch (e) { say('Нет связи. Открой приглашение ещё раз, когда появится интернет.'); }
+}
+if (syncOn()) { loadMe().then(() => inviteCode ? acceptInvite(inviteCode) : null); pull(); }
 fetch('version.json?t=' + Date.now(), {cache:'no-store'}).then(r => r.json()).then(v => {
   if (v.version && v.version !== APP_VERSION && !sessionStorage.getItem('upd_' + v.version)) {
     sessionStorage.setItem('upd_' + v.version, '1');
-    location.replace(location.pathname + '?v=' + encodeURIComponent(v.version) + location.hash);
+    const u = new URL(location.href); u.searchParams.set('v', v.version);
+    location.replace(u.pathname + u.search + location.hash);
   }
 }).catch(() => {});
 </script>
