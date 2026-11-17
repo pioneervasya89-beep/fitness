@@ -185,6 +185,34 @@ const QUOTES = [
 ];
 const WIN_PHRASES = ['Отличная работа!', 'Мощно!', 'Ещё один кирпич в фундамент!', 'Так держать!', 'Зачёт!', 'Сильнее, чем вчера!'];
 
+const EN = {pull_light:'Pull-Up, paused', sumo:'Sumo Deadlift', bench:'Bench Press', db_row:'Incline Dumbbell Row', db_press:'Seated Dumbbell Shoulder Press', lateral:'Dumbbell Lateral Raise', leg_curl:'Leg Curl', calf:'Calf Raise', bosu:'BOSU Crunch', hang:'Dead Hang', pullups:'Pull-Up', incline_db:'Incline Dumbbell Press', cgbp:'Close-Grip Bench Press', curl:'Barbell Curl', crossover:'Low Cable Crossover', ext:'Back Extension', leg_press:'Leg Press', plank:'Plank'};
+function sessionText(ss) {
+  const d = new Date(ss.date);
+  const date = d.toLocaleDateString('ru-RU', {day:'numeric', month:'long', year:'numeric'});
+  const time = d.toLocaleTimeString('ru-RU', {hour:'2-digit', minute:'2-digit'});
+  const head = [`Силовая тренировка — ${DAY_NAME[ss.day]}`, `${date}, ${time}${ss.duration ? ' · ' + ss.duration + ' мин' : ''} · тоннаж ${fmt(Math.round(tonnage(ss.items) / 10) / 100)} т`];
+  const lines = [];
+  let n = 0;
+  for (const it of ss.items) {
+    const e = EX[it.id];
+    if (it.skipped || !it.done.some(v => v > 0)) continue;
+    const reps = it.done.filter(v => v > 0);
+    const same = reps.every(r => r === reps[0]);
+    let body;
+    if (e.type === 'time') body = same ? `${reps.length} × ${reps[0]} с` : reps.map(r => r + ' с').join(', ');
+    else {
+      const w = e.type === 'fixed' || (e.extra && !it.load) ? 'вес тела' : (e.extra ? 'вес тела +' + fmt(it.load) + ' кг' : fmt(it.load) + ' кг');
+      body = (same ? `${reps.length} × ${reps[0]}` : reps.join(' / ')) + ' повт · ' + w;
+    }
+    lines.push(`${++n}. ${e.name} (${EN[e.id]}) — ${body}`);
+  }
+  return head.join('\n') + '\n\n' + lines.join('\n') + `\n\nПодходов: ${ss.items.reduce((a, it) => a + (it.skipped ? 0 : it.done.filter(v => v > 0).length), 0)}`;
+}
+function copyText(txt, holder) {
+  const done = () => { haptic('medium'); holder.innerHTML = '<div class="badge ok" style="margin-top:8px"><i class="ti ti-check"></i> Скопировано — вставь в WHOOP</div>'; };
+  const fallback = () => { holder.innerHTML = `<div class="m" style="margin-top:8px">Выдели текст и скопируй:</div><textarea readonly style="margin-top:4px;min-height:220px">${esc(txt)}</textarea>`; holder.querySelector('textarea').select(); };
+  try { navigator.clipboard.writeText(txt).then(done, fallback); } catch (e) { fallback(); }
+}
 const ACH = [
   {id:'first', icon:'ti-flag', name:'Первый шаг', desc:'Первая тренировка', test:x => x.n >= 1},
   {id:'calib', icon:'ti-target-arrow', name:'Точка отсчёта', desc:'Обе стартовые', test:x => x.calib},
@@ -464,7 +492,7 @@ function finishSession() {
   try { inTg && tg.HapticFeedback.notificationOccurred('success'); } catch (e) {}
   stopTimer();
   view.screen = 'summary';
-  view.summary = {day:a.day, calib:a.calib, results, duration, ton:tonnage(items), fresh:fresh.map(f => f.id), phrase:WIN_PHRASES[Math.floor(Math.random() * WIN_PHRASES.length)]};
+  view.summary = {hIdx:state.history.length - 1, day:a.day, calib:a.calib, results, duration, ton:tonnage(items), fresh:fresh.map(f => f.id), phrase:WIN_PHRASES[Math.floor(Math.random() * WIN_PHRASES.length)]};
   render(); scrollTo(0, 0);
   confetti();
 }
@@ -679,6 +707,7 @@ function summary() {
     <div class="c"><div class="m">Рекордов</div><div class="big" style="color:var(--gold)">${prs}</div></div>
   </div>
   ${fresh}
+  <div class="c"><button class="btn sec sm" data-a="copyss" data-h="${v.hIdx}"><i class="ti ti-copy"></i> Скопировать тренировку для WHOOP</button><div id="cp${v.hIdx}"></div></div>
   <h3>Что дальше</h3>
   ${rows}
   <button class="btn" data-a="home" style="margin-top:6px">На главную</button></div>`;
@@ -739,6 +768,7 @@ function progress() {
     ${chart}
     ${hist ? `<div style="margin-top:8px">${hist}</div>` : ''}
   </div>
+  ${h.length ? `<h3>История тренировок</h3>${h.map((ss, k) => ({ss, k})).reverse().slice(0, view.histAll ? 999 : 5).map(({ss, k}) => `<div class="c"><div class="row"><div><div style="font-weight:700">${DAY_NAME[ss.day]}${ss.calib ? ' <span class="badge">стартовая</span>' : ''}</div><div class="m">${new Date(ss.date).toLocaleDateString('ru-RU', {day:'numeric', month:'long'})}${ss.duration ? ' · ' + ss.duration + ' мин' : ''} · ${fmt(Math.round(tonnage(ss.items) / 10) / 100)} т</div></div><button class="btn sec sm" data-a="copyss" data-h="${k}" style="width:auto;padding:9px 12px"><i class="ti ti-copy"></i> Для WHOOP</button></div><div id="cp${k}"></div></div>`).join('')}${h.length > 5 && !view.histAll ? '<button class="btn sec sm" data-a="histall" style="margin-bottom:10px">Показать все</button>' : ''}` : ''}
   <h3>Достижения <span class="m">${got} / ${ACH.length}</span></h3>
   <div class="ach" style="margin-bottom:10px">${ach}</div>
   <h3>Где ты на лестнице</h3>
@@ -826,6 +856,8 @@ document.addEventListener('click', ev => {
     case 't30': if (timer) { timer.end += 30000; timer.total += 30; tickTimer(); } return;
     case 'tstop': stopTimer(); return;
     case 'pex': view.progEx = b.dataset.id; rerender(); return;
+    case 'copyss': { const k = +b.dataset.h; copyText(sessionText(state.history[k]), document.getElementById('cp' + k)); return; }
+    case 'histall': view.histAll = true; rerender(); return;
     case 'export': {
       const s = JSON.stringify(state);
       const io = document.getElementById('io');
