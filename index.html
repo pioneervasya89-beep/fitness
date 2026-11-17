@@ -158,7 +158,7 @@ const DAY_SUB = {D1:'Ноги, грудь, спина, плечи', D2:'Спин
 const ALL = [...PROGRAM.D1, ...PROGRAM.D2];
 const EX = Object.fromEntries(ALL.map(e => [e.id, e]));
 const KEY = 'fitprog_v1';
-const APP_VERSION = '2026-11-17c';
+const APP_VERSION = '2026-11-17d';
 
 const QUOTES = [
   'Сила — это сумма скучных тренировок, которые ты не пропустил.',
@@ -187,11 +187,20 @@ const QUOTES = [
 const WIN_PHRASES = ['Отличная работа!', 'Мощно!', 'Ещё один кирпич в фундамент!', 'Так держать!', 'Зачёт!', 'Сильнее, чем вчера!'];
 
 const EN = {pull_light:'Pull-Up, paused', sumo:'Sumo Deadlift', bench:'Bench Press', db_row:'Incline Dumbbell Row', db_press:'Seated Dumbbell Shoulder Press', lateral:'Dumbbell Lateral Raise', leg_curl:'Leg Curl', calf:'Calf Raise', bosu:'BOSU Crunch', hang:'Dead Hang', pullups:'Pull-Up', incline_db:'Incline Dumbbell Press', cgbp:'Close-Grip Bench Press', curl:'Barbell Curl', crossover:'Low Cable Crossover', ext:'Back Extension', leg_press:'Leg Press', plank:'Plank'};
+const MAX_DUR = 240;
+const durOk = d => typeof d === 'number' && d > 0 && d <= MAX_DUR;
+// Workout time = first set mark to last set mark plus ~3 min for the last set.
+// Ignores time the workout sat open before the first mark or after the last one.
+function workDuration(a, end) {
+  if (a.firstMark && a.lastMark) return Math.max(1, Math.round((a.lastMark - a.firstMark) / 60000) + 3);
+  const d = Math.round((end - a.started) / 60000);
+  return durOk(d) ? d : null;
+}
 function sessionText(ss) {
   const d = new Date(ss.date);
   const date = d.toLocaleDateString('ru-RU', {day:'numeric', month:'long', year:'numeric'});
   const time = d.toLocaleTimeString('ru-RU', {hour:'2-digit', minute:'2-digit'});
-  const head = [`Силовая тренировка — ${DAY_NAME[ss.day]}`, `${date}, ${time}${ss.duration ? ' · ' + ss.duration + ' мин' : ''} · тоннаж ${fmt(Math.round(tonnage(ss.items) / 10) / 100)} т`];
+  const head = [`Силовая тренировка — ${DAY_NAME[ss.day]}`, `${date}, ${time}${durOk(ss.duration) ? ' · ' + ss.duration + ' мин' : ''} · тоннаж ${fmt(Math.round(tonnage(ss.items) / 10) / 100)} т`];
   const lines = [];
   let n = 0;
   for (const it of ss.items) {
@@ -434,7 +443,12 @@ const isSelf = () => !ME || who === ME.id;
 let cloudT = null, editSeq = 0, pendingNotify = null;
 function save(notify) {
   state.updated = Date.now();
-  if (state.active && view.screen === 'ex' && state.active.items[view.exIdx]) state.active.items[view.exIdx].t = Date.now();
+  if (state.active && view.screen === 'ex' && state.active.items[view.exIdx]) {
+    const now = Date.now();
+    state.active.items[view.exIdx].t = now;
+    if (!state.active.firstMark) state.active.firstMark = now;
+    state.active.lastMark = now;
+  }
   persistLocal();
   if (syncOn()) {
     if (notify) pendingNotify = {uid:who, payload:notify};
@@ -489,6 +503,9 @@ function merge(L, R) {
   const la = L.active, ra = R.active;
   if (la && ra && la.started === ra.started) {
     M.active.items = ra.items.map((ri, k) => { const li = la.items[k]; return li && (li.t || 0) > (ri.t || 0) ? li : ri; });
+    const fm = [la.firstMark, ra.firstMark].filter(Boolean);
+    if (fm.length) M.active.firstMark = Math.min(...fm);
+    M.active.lastMark = Math.max(la.lastMark || 0, ra.lastMark || 0) || undefined;
   } else if (la || ra) {
     M.active = (L.activeT || 0) > (R.activeT || 0) ? la : ra;
     M.activeT = Math.max(L.activeT || 0, R.activeT || 0);
@@ -643,7 +660,7 @@ function finishSession() {
     results.push({id:it.id, d:r.d, why:r.why, after, pr});
   }
   const items = a.items.map((it, i) => ({id:it.id, load:it.load, targets:it.targets, done:it.done.map((v, j) => it.checked[j] ? v : 0), reserve:it.reserve, tech:it.tech, skipped:it.skipped, d:results[i].d, pr:results[i].pr}));
-  const duration = Math.round((Date.now() - a.started) / 60000);
+  const duration = workDuration(a, Date.now());
   state.history.push({date:Date.now(), day:a.day, idx:a.idx, calib:a.calib, duration, items});
   if (a.calib) state.calibrated[a.day] = true;
   state.sessionIdx++;
@@ -651,7 +668,7 @@ function finishSession() {
   const fresh = checkAchievements();
   const ton = tonnage(items);
   const marks = {up:'↑', keep:'=', back:'↓', deload:'↓ −10%', skip:'—'};
-  const summaryText = `${DAY_NAME[a.day]}${a.calib ? ' (стартовая)' : ''} · ${duration} мин · тоннаж ${fmt(Math.round(ton / 10) / 100)} т\n\n` +
+  const summaryText = `${DAY_NAME[a.day]}${a.calib ? ' (стартовая)' : ''}${duration ? ' · ' + duration + ' мин' : ''} · тоннаж ${fmt(Math.round(ton / 10) / 100)} т\n\n` +
     results.filter(r => r.d !== 'fixed').map(r => `${marks[r.d]} ${EX[r.id].name}${r.pr ? ' ⚡ рекорд' : ''}${r.after && r.d !== 'skip' ? ' → ' + r.after : ''}`).join('\n');
   save({summary:summaryText, whoop:sessionText(state.history[state.history.length - 1])});
   try { inTg && tg.HapticFeedback.notificationOccurred('success'); } catch (e) {}
@@ -784,7 +801,7 @@ function workout() {
     return `<div class="c ex" data-a="ex" data-i="${i}"><div class="thumb">${body(e.zones)}</div><div class="n"><div class="nm">${e.name}</div><div class="m">${planLabel(e, {load:it.load, reps:it.targets})}${changed}</div>${doneLine}</div>${st}</div>`;
   }).join('');
   const total = a.items.length, done = a.items.filter(it => it.skipped || it.checked.every(Boolean)).length;
-  const mins = Math.round((Date.now() - a.started) / 60000);
+  const mins = a.firstMark ? Math.round((Date.now() - a.firstMark) / 60000) : 0;
   const cheer = done === 0 ? 'Поехали! Начни с разминки.' : done < total / 2 ? 'Хороший темп, продолжай.' : done < total ? 'Больше половины позади!' : 'Всё сделано — жми «Завершить»!';
   return `<div class="screen">
   <div class="row" style="margin-bottom:8px"><button class="back" data-a="home" aria-label="Назад"><i class="ti ti-arrow-left"></i></button><span class="m"><i class="ti ti-clock"></i> ${mins} мин ${syncOn() ? syncDot() : ''}</span><span class="m">${done} / ${total}</span></div>
@@ -868,7 +885,7 @@ function summary() {
     <h1 style="margin:0">${v.calib ? 'Точка отсчёта есть!' : v.phrase}</h1>
     <div class="m">${DAY_NAME[v.day]} · ${v.calib ? 'стартовые веса сохранены, дальше только вверх' : 'ещё одна тренировка в копилку'}</div></div>
   <div class="grid2">
-    <div class="c"><div class="m">Время</div><div class="big">${v.duration} <span class="m">мин</span></div></div>
+    <div class="c"><div class="m">Время</div><div class="big">${v.duration || '—'} <span class="m">мин</span></div></div>
     <div class="c"><div class="m">Тоннаж</div><div class="big">${fmt(Math.round(v.ton / 10) / 100)} <span class="m">т</span></div></div>
     <div class="c"><div class="m">Шагов вверх</div><div class="big o">${ups}</div></div>
     <div class="c"><div class="m">Рекордов</div><div class="big" style="color:var(--gold)">${prs}</div></div>
@@ -928,7 +945,7 @@ function progress() {
     <div class="c"><div class="m">Рекордов</div><div class="big" style="color:var(--gold)">${x.prs}</div></div>
   </div>
   <div class="c row"><div><div class="m">Тоннаж за 7 дней</div><div class="big">${fmt(Math.round(ton / 100) / 10)} <span class="m">т</span></div></div><div style="text-align:right"><div class="m">Серия</div><div class="big"><i class="ti ti-flame o"></i> ${x.streak}</div></div></div>
-  <h3>История тренировок</h3>${h.length ? `${h.map((ss, k) => ({ss, k})).reverse().slice(0, view.histAll ? 999 : 5).map(({ss, k}) => `<div class="c"><div class="row"><div><div style="font-weight:700">${DAY_NAME[ss.day]}${ss.calib ? ' <span class="badge">стартовая</span>' : ''}</div><div class="m">${new Date(ss.date).toLocaleDateString('ru-RU', {day:'numeric', month:'long'})}${ss.duration ? ' · ' + ss.duration + ' мин' : ''} · ${fmt(Math.round(tonnage(ss.items) / 10) / 100)} т</div></div><button class="btn sec sm" data-a="copyss" data-h="${k}" style="width:auto;padding:9px 12px"><i class="ti ti-copy"></i> Для WHOOP</button></div><div id="cp${k}"></div></div>`).join('')}${h.length > 5 && !view.histAll ? '<button class="btn sec sm" data-a="histall" style="margin-bottom:10px">Показать все</button>' : ''}` : `<div class="c m" style="text-align:center">Здесь появятся завершённые тренировки. Тренировка попадает в историю после кнопки «Завершить тренировку».${state.active ? ' Сейчас у тебя есть незавершённая тренировка — открой её на вкладке «Сегодня» и заверши.' : ''}</div>`}
+  <h3>История тренировок</h3>${h.length ? `${h.map((ss, k) => ({ss, k})).reverse().slice(0, view.histAll ? 999 : 5).map(({ss, k}) => `<div class="c"><div class="row"><div><div style="font-weight:700">${DAY_NAME[ss.day]}${ss.calib ? ' <span class="badge">стартовая</span>' : ''}</div><div class="m">${new Date(ss.date).toLocaleDateString('ru-RU', {day:'numeric', month:'long'})}${durOk(ss.duration) ? ' · ' + ss.duration + ' мин' : ''} · ${fmt(Math.round(tonnage(ss.items) / 10) / 100)} т <span data-a="editdur" data-h="${k}" style="cursor:pointer;color:${durOk(ss.duration) ? 'var(--muted)' : 'var(--acc)'}"><i class="ti ti-pencil"></i>${durOk(ss.duration) ? '' : ' указать время'}</span></div></div><button class="btn sec sm" data-a="copyss" data-h="${k}" style="width:auto;padding:9px 12px"><i class="ti ti-copy"></i> Для WHOOP</button></div>${view.editDur === k ? `<div class="row" style="margin-top:8px;gap:6px"><span class="m">Длительность, мин</span><div class="stepper"><button data-a="durv" data-v="-5">−</button><input value="${view.durVal}" readonly><button data-a="durv" data-v="5">+</button></div><button class="btn sm" data-a="dursave" style="width:auto">OK</button></div>` : ''}<div id="cp${k}"></div></div>`).join('')}${h.length > 5 && !view.histAll ? '<button class="btn sec sm" data-a="histall" style="margin-bottom:10px">Показать все</button>' : ''}` : `<div class="c m" style="text-align:center">Здесь появятся завершённые тренировки. Тренировка попадает в историю после кнопки «Завершить тренировку».${state.active ? ' Сейчас у тебя есть незавершённая тренировка — открой её на вкладке «Сегодня» и заверши.' : ''}</div>`}
   <div class="tabs">${tabs}</div>
   <div class="c">
     <div class="row"><span style="font-weight:700">${e.name}</span>${delta ? `<span class="badge ok">${delta > 0 ? '+' : ''}${fmt(delta)} ${pts[0].u}</span>` : ''}</div>
@@ -1075,6 +1092,9 @@ document.addEventListener('click', ev => {
     case 'pex': view.progEx = b.dataset.id; rerender(); return;
     case 'copyss': { const k = +b.dataset.h; copyText(sessionText(state.history[k]), document.getElementById('cp' + k)); return; }
     case 'histall': view.histAll = true; rerender(); return;
+    case 'editdur': { const k = +b.dataset.h; view.editDur = view.editDur === k ? null : k; const d = state.history[k].duration; view.durVal = durOk(d) ? d : 60; rerender(); return; }
+    case 'durv': view.durVal = Math.min(MAX_DUR, Math.max(5, view.durVal + +b.dataset.v)); rerender(); return;
+    case 'dursave': state.history[view.editDur].duration = view.durVal; view.editDur = null; save(); rerender(); haptic('medium'); return;
     case 'export': {
       const s = JSON.stringify(state);
       const io = document.getElementById('io');
