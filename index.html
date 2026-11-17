@@ -158,6 +158,7 @@ const DAY_SUB = {D1:'Ноги, грудь, спина, плечи', D2:'Спин
 const ALL = [...PROGRAM.D1, ...PROGRAM.D2];
 const EX = Object.fromEntries(ALL.map(e => [e.id, e]));
 const KEY = 'fitprog_v1';
+const APP_VERSION = '2026-11-17b';
 
 const QUOTES = [
   'Сила — это сумма скучных тренировок, которые ты не пропустил.',
@@ -761,6 +762,7 @@ function progress() {
     <div class="c"><div class="m">Рекордов</div><div class="big" style="color:var(--gold)">${x.prs}</div></div>
   </div>
   <div class="c row"><div><div class="m">Тоннаж за 7 дней</div><div class="big">${fmt(Math.round(ton / 100) / 10)} <span class="m">т</span></div></div><div style="text-align:right"><div class="m">Серия</div><div class="big"><i class="ti ti-flame o"></i> ${x.streak}</div></div></div>
+  <h3>История тренировок</h3>${h.length ? `${h.map((ss, k) => ({ss, k})).reverse().slice(0, view.histAll ? 999 : 5).map(({ss, k}) => `<div class="c"><div class="row"><div><div style="font-weight:700">${DAY_NAME[ss.day]}${ss.calib ? ' <span class="badge">стартовая</span>' : ''}</div><div class="m">${new Date(ss.date).toLocaleDateString('ru-RU', {day:'numeric', month:'long'})}${ss.duration ? ' · ' + ss.duration + ' мин' : ''} · ${fmt(Math.round(tonnage(ss.items) / 10) / 100)} т</div></div><button class="btn sec sm" data-a="copyss" data-h="${k}" style="width:auto;padding:9px 12px"><i class="ti ti-copy"></i> Для WHOOP</button></div><div id="cp${k}"></div></div>`).join('')}${h.length > 5 && !view.histAll ? '<button class="btn sec sm" data-a="histall" style="margin-bottom:10px">Показать все</button>' : ''}` : `<div class="c m" style="text-align:center">Здесь появятся завершённые тренировки. Тренировка попадает в историю после кнопки «Завершить тренировку».${state.active ? ' Сейчас у тебя есть незавершённая тренировка — открой её на вкладке «Сегодня» и заверши.' : ''}</div>`}
   <div class="tabs">${tabs}</div>
   <div class="c">
     <div class="row"><span style="font-weight:700">${e.name}</span>${delta ? `<span class="badge ok">${delta > 0 ? '+' : ''}${fmt(delta)} ${pts[0].u}</span>` : ''}</div>
@@ -768,7 +770,6 @@ function progress() {
     ${chart}
     ${hist ? `<div style="margin-top:8px">${hist}</div>` : ''}
   </div>
-  ${h.length ? `<h3>История тренировок</h3>${h.map((ss, k) => ({ss, k})).reverse().slice(0, view.histAll ? 999 : 5).map(({ss, k}) => `<div class="c"><div class="row"><div><div style="font-weight:700">${DAY_NAME[ss.day]}${ss.calib ? ' <span class="badge">стартовая</span>' : ''}</div><div class="m">${new Date(ss.date).toLocaleDateString('ru-RU', {day:'numeric', month:'long'})}${ss.duration ? ' · ' + ss.duration + ' мин' : ''} · ${fmt(Math.round(tonnage(ss.items) / 10) / 100)} т</div></div><button class="btn sec sm" data-a="copyss" data-h="${k}" style="width:auto;padding:9px 12px"><i class="ti ti-copy"></i> Для WHOOP</button></div><div id="cp${k}"></div></div>`).join('')}${h.length > 5 && !view.histAll ? '<button class="btn sec sm" data-a="histall" style="margin-bottom:10px">Показать все</button>' : ''}` : ''}
   <h3>Достижения <span class="m">${got} / ${ACH.length}</span></h3>
   <div class="ach" style="margin-bottom:10px">${ach}</div>
   <h3>Где ты на лестнице</h3>
@@ -797,7 +798,7 @@ function programScreen() {
     <button class="btn sec sm" data-a="recal" style="margin-bottom:8px"><i class="ti ti-target-arrow"></i> Пройти стартовые тренировки заново</button>
     <button class="btn sec sm" data-a="reset" style="color:var(--bad)"><i class="ti ti-trash"></i> Сбросить всё</button>
     <div id="io"></div>
-    <div class="m" style="margin-top:8px">${inTg ? 'Данные синхронизируются через Telegram' : 'Данные хранятся в этом браузере'}</div>
+    <div class="m" style="margin-top:8px">${inTg ? 'Данные синхронизируются через Telegram' : 'Данные хранятся в этом браузере'} · версия ${APP_VERSION}</div>
   </div></div>`;
 }
 
@@ -894,6 +895,12 @@ document.addEventListener('change', ev => {
 if (state.active) view.screen = 'workout';
 render();
 cloudLoad();
+fetch('version.json?t=' + Date.now(), {cache:'no-store'}).then(r => r.json()).then(v => {
+  if (v.version && v.version !== APP_VERSION && !sessionStorage.getItem('upd_' + v.version)) {
+    sessionStorage.setItem('upd_' + v.version, '1');
+    location.replace(location.pathname + '?v=' + encodeURIComponent(v.version) + location.hash);
+  }
+}).catch(() => {});
 </script>
 </body>
 </html>
