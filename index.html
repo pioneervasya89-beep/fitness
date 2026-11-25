@@ -145,8 +145,8 @@ const PROGRAM = {
       repsSteps:[[7,7,8],[8,7,8],[8,8,8],[9,8,8],[9,9,8],[9,9,9]], note:'Последний подход — в отказ. После 9/9/9: +2,5 кг и снова с 7/7/8', rest:180, base:true, zones:['lat','arm','fa'], group:'Спина · бицепс'},
     {id:'incline_db', name:'Жим гантелей на наклонной', type:'weight', sets:3, reps:10, start:20, offs:[0,0,2,2,4,4], round:2, rest:150, base:true, zones:['ch','sh'], group:'Верх груди'},
     {id:'cgbp', name:'Жим узким хватом', type:'weight', sets:3, reps:10, start:40, offs:[0,2.5,5,7.5,10,12.5], round:2.5, rest:150, base:true, zones:['arm','ch'], group:'Трицепс · грудь'},
-    {id:'curl', name:'Подъём штанги на бицепс', type:'reps', sets:3, start:20, addAfter:2.5, round:2.5,
-      repsSteps:[[8,8,8],[9,9,9],[10,10,10],[11,11,11],[12,12,12],[12,12,12]], note:'Растут повторы. После 3×12: +2,5 кг и снова с 3×8', rest:90, zones:['arm','fa'], group:'Бицепс'},
+    {id:'curl', name:'Подъём штанги на бицепс', type:'reps', sets:3, start:20, addAfter:5, round:5,
+      repsSteps:[[8,8,8],[9,9,9],[10,10,10],[11,11,11],[12,12,12],[13,13,13],[14,14,14],[15,15,15]], note:'Грифы только 15 / 20 / 25 кг: сначала растут повторы. После 3×15 — следующий гриф (+5 кг) и снова с 3×8', rest:90, zones:['arm','fa'], group:'Бицепс'},
     {id:'crossover', name:'Кроссовер с нижнего блока', type:'weight', sets:3, reps:15, start:5, offs:[0,0,2.5,2.5,5,5], round:2.5, rest:75, note:'Шаг = 1 плитка (считаем 2,5 кг)', zones:['ch','sh'], group:'Грудь'},
     {id:'ext', name:'Экстензия', type:'weight', sets:3, reps:12, start:5, offs:[0,0,2.5,2.5,5,5], round:2.5, rest:75, zones:['gl','lat'], group:'Поясница · ягодицы'},
     {id:'leg_press', name:'Жим ногами', type:'weight', sets:3, reps:12, start:140, offs:[0,10,20,30,40,50], round:5, rest:150, base:true, zones:['th','gl','cf'], group:'Ноги'},
@@ -158,7 +158,7 @@ const DAY_SUB = {D1:'Ноги, грудь, спина, плечи', D2:'Спин
 const ALL = [...PROGRAM.D1, ...PROGRAM.D2];
 const EX = Object.fromEntries(ALL.map(e => [e.id, e]));
 const KEY = 'fitprog_v1';
-const APP_VERSION = '2026-11-25b';
+const APP_VERSION = '2026-11-25c';
 
 const QUOTES = [
   'Сила — это сумма скучных тренировок, которые ты не пропустил.',
@@ -345,7 +345,12 @@ function stepDown(e, s) {
   else { s.base = s.base + v - minInc(e); s.step = 0; }
 }
 function deload(e, s, cur) {
-  if (e.type === 'reps') s.weight = e.extra ? roundTo(cur * 0.9, e.round) : Math.max(e.round, roundTo(cur * 0.9, e.round));
+  if (e.type === 'reps') {
+    const w = e.extra ? roundTo(cur * 0.9, e.round) : Math.max(e.round, roundTo(cur * 0.9, e.round));
+    // Fixed barbells (5 kg jumps): -10% rounds back to the same bar, so drop reps two steps instead.
+    if (w >= cur) { s.step = Math.max(0, s.step - 2); s.fails = 0; s.check = false; return; }
+    s.weight = w;
+  }
   else s.base = Math.max(e.round, roundTo(cur * 0.9, e.round));
   s.step = 0; s.fails = 0; s.check = false;
 }
