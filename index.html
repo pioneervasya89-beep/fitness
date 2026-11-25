@@ -158,7 +158,7 @@ const DAY_SUB = {D1:'Ноги, грудь, спина, плечи', D2:'Спин
 const ALL = [...PROGRAM.D1, ...PROGRAM.D2];
 const EX = Object.fromEntries(ALL.map(e => [e.id, e]));
 const KEY = 'fitprog_v1';
-const APP_VERSION = '2026-11-17d';
+const APP_VERSION = '2026-11-25a';
 
 const QUOTES = [
   'Сила — это сумма скучных тренировок, которые ты не пропустил.',
@@ -353,7 +353,8 @@ function evaluate(e, s, it, calib) {
   if (e.type === 'fixed') return {d:'fixed', why:'Без прогрессии'};
   if (it.skipped) return {d:'skip', why:'Пропущено — план тот же'};
   const allMet = it.targets.every((t, i) => it.checked[i] && it.done[i] >= t);
-  const reserveOk = e.noReserve || (it.reserve !== null && it.reserve >= 1);
+  // No answer means "had a rep in reserve": the athlete only taps when there was none.
+  const reserveOk = e.noReserve || it.reserve === null || it.reserve === undefined || it.reserve >= 1;
   const planned = target(e, s).load;
   if (calib) {
     if (e.type === 'reps') s.weight = it.load; else { s.step = 0; s.base = it.load; }
@@ -640,7 +641,7 @@ function startSession() {
     day, calib, idx:state.sessionIdx, started:Date.now(), by:ME ? ME.id : 0,
     items: PROGRAM[day].map(e => {
       const t = target(e, state.ex[e.id]);
-      return {id:e.id, load:t.load, plannedLoad:t.load, targets:t.reps, done:[...t.reps], checked:t.reps.map(() => false), reserve:null, tech:false, skipped:false};
+      return {id:e.id, load:t.load, plannedLoad:t.load, targets:t.reps, done:[...t.reps], checked:t.reps.map(() => false), reserve:1, tech:false, skipped:false};
     })
   };
   state.activeT = Date.now();
@@ -839,7 +840,7 @@ function exScreen() {
   let reserve = '';
   if (e.type !== 'fixed' && !e.noReserve) {
     const opts = [[0, '0'], [1, '1'], [2, '2'], [3, '3+']];
-    reserve = `<div class="c"><div style="margin-bottom:8px;font-weight:600">Сколько ещё ${e.type === 'time' ? 'мог простоять (по 5 с)' : 'повторов мог сделать'}?</div>
+    reserve = `<div class="c"><div style="margin-bottom:8px;font-weight:600">Сколько ещё ${e.type === 'time' ? 'мог простоять (по 5 с)' : 'повторов мог сделать'}?<div class="m" style="font-weight:400">Стоит 1 — если запас был, ничего не трогай. Не было — нажми 0.</div></div>
       <div class="chips">${opts.map(([v, l]) => `<button data-a="res" data-v="${v}" class="${it.reserve === v ? 'on' : ''}">${l}</button>`).join('')}</div>${techT}</div>`;
   } else if (e.noReserve) reserve = `<div class="c">${techT}</div>`;
   let ladder = '';
@@ -975,7 +976,7 @@ function programScreen() {
   return `<div class="screen"><h1>Программа${whoName() ? ' <span class="m">· ' + esc(whoName()) + '</span>' : ''}</h1>
   <div class="c"><div style="font-weight:700;margin-bottom:6px"><i class="ti ti-stairs-up o"></i> Правила прогрессии</div>
     <div class="m" style="font-size:13px;line-height:1.6">
-    1. Все подходы чисто и запас ≥1 повтора — шаг вверх.<br>2. Не добрал — то же самое.<br>3. Два раза подряд не добрал — минус 10% и снова вверх.<br>4. Техника поплыла — вес не растёт.<br>5. Первая тренировка на новом весе — проверка: запас &lt;1 — откат на шаг.<br>Первые Д1 и Д2 — стартовые: вводишь реальный вес.</div></div>
+    1. Все подходы чисто и запас ≥1 повтора — шаг вверх. Запас 1 стоит по умолчанию, нажимать нужно только 0.<br>2. Не добрал — то же самое.<br>3. Два раза подряд не добрал — минус 10% и снова вверх.<br>4. Техника поплыла — вес не растёт.<br>5. Первая тренировка на новом весе — проверка: запас &lt;1 — откат на шаг.<br>Первые Д1 и Д2 — стартовые: вводишь реальный вес.</div></div>
   <h3>День 1 <span class="m">${DAY_SUB.D1}</span></h3>${block('D1')}
   <h3>День 2 <span class="m">${DAY_SUB.D2}</span></h3>${block('D2')}
   ${coachSection()}
